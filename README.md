@@ -35,11 +35,11 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	 External links list:
 	         -x <URL>       List articles containing an external link aka Special:Linksearch
 
-         Recent changes:
-                 -r             Recent changes (past 30 days) aka Special:RecentChanges. -u or -t required. 
-                 -f <username>  Only list changes made by this user.
-                 -k <tag>       Only list changes tagged with this tag.
-                 -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
+	 Recent changes:
+	         -r             Recent changes (past 30 days) aka Special:RecentChanges. -u or -t required. 
+	         -f <username>  Only list changes made by this user.
+	         -k <tag>       Only list changes tagged with this tag.
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
 
 	 Print wiki text:
 	       -w <article>     Print wiki text of article
@@ -85,8 +85,8 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	 External link list:
 	   wikiget -x "news.yahoo.com"                    (list articles containing a URL that contains this)
 
-         Recent changes:
-           wikiget -r -k "OAuth CID: 678"                 (list recent changes tagged with this tag)
+	 Recent changes:
+	   wikiget -r -k "OAuth CID: 678"                 (list recent changes tagged with this tag)
 
 	 Print wiki text:
 	   wikiget -w "Paris"                             (print wiki text of article "Paris" on the English Wiki)
