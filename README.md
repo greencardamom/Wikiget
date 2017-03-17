@@ -37,7 +37,7 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 
 	 Recent changes:
 	         -r             Recent changes (past 30 days) aka Special:RecentChanges. -u or -t required. 
-	         -f <username>  Only list changes made by this user.
+	         -o <username>  Only list changes made by this user.
 	         -k <tag>       Only list changes tagged with this tag.
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
 

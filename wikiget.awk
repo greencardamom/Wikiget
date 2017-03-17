@@ -323,8 +323,8 @@ function usage() {
   print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
   print ""
   print " Recent changes:"
-  print "       -r               Recent changes aka Special:RecentChanges. -u or -t required. "
-  print "         -f <username>  Only list changes made by this user."
+  print "       -r               Recent changes (past 30 days) aka Special:RecentChanges. Either -o or -t required. "
+  print "         -o <username>  Only list changes made by this user."
   print "         -k <tag>       Only list changes tagged with this tag."
   print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
   print ""
@@ -373,6 +373,9 @@ function usage_extended() {
   print ""
   print " External link list:"
   print "   wikiget -x \"news.yahoo.com\"                    (list articles containing a URL that contains this)"
+  print ""
+  print " Recent changes:"
+  print "   wikiget -r -k \"OAuth CID: 678\"                 (list recent changes last 30 days tagged with this)"
   print ""
   print " Print wiki text:"
   print "   wikiget -w \"Paris\"                       (print wiki text of article \"Paris\" on the English Wiki)"
@@ -732,7 +735,7 @@ function rechanges(username, tag,      url, results, entity) {
         else 
           return 0
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
 
         print url
 
@@ -751,7 +754,7 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode ) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
+          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
           jsonin = http2var(url)
           jsonout = jsonout "\n" json2var(jsonin)
           continuecode = getcontinue(jsonin,"rccontinue")
