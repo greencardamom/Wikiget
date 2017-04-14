@@ -6,6 +6,7 @@
 
 # Changes in reverse chronological order
 #
+# 0.61 Apr 14      - fix -r (rccontinue) 
 # 0.60 Mar 17      - add -r option
 # 0.51 Mar 13 2017 - add -n option when using -x
 # 0.50 Dec 15 2016 - add -x (external link search) 
@@ -47,7 +48,7 @@ BEGIN {
 
   Contact = "User:Green_Cardamom (en)"                        # Your contact info - informational only for API Agent string
   G["program"] = "Wikiget"
-  G["version"] = "0.60"
+  G["version"] = "0.61"
   G["agent"] = Program " " G["version"] " " Contact
   G["maxlag"] = "5"                                           # Wikimedia API max lag default
   G["lang"] = "en"                                            # Wikipedia language default
@@ -754,7 +755,7 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode ) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
+          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
           jsonin = http2var(url)
           jsonout = jsonout "\n" json2var(jsonin)
           continuecode = getcontinue(jsonin,"rccontinue")
