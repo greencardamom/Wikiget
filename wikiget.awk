@@ -6,6 +6,7 @@
 
 # Changes in reverse chronological order
 #
+# 0.62 Oct 03      - -a max's out at 10000
 # 0.61 Apr 14      - fix -r (rccontinue) 
 # 0.60 Mar 17      - add -r option
 # 0.51 Mar 13 2017 - add -n option when using -x
@@ -48,7 +49,7 @@ BEGIN {
 
   Contact = "User:Green_Cardamom (en)"                        # Your contact info - informational only for API Agent string
   G["program"] = "Wikiget"
-  G["version"] = "0.61"
+  G["version"] = "0.62"
   G["agent"] = Program " " G["version"] " " Contact
   G["maxlag"] = "5"                                           # Wikimedia API max lag default
   G["lang"] = "en"                                            # Wikipedia language default
@@ -171,7 +172,7 @@ function processarguments(  c,a,i) {
   if(isanumber(Arguments["maxsearch"])) 
     G["maxsearch"] = Arguments["maxsearch"]
   else
-    G["maxsearch"] = 1000
+    G["maxsearch"] = 10000
 
   if(isanumber(Arguments["namespace"])) 
     G["namespace"] = Arguments["namespace"]
@@ -316,8 +317,8 @@ function usage() {
   print "         -d             (option) Include search-result snippet in output (default: title only)"
   print "         -g <target>    (option) Search in \"title\" or \"text\" (default: \"text\")"
   print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
-  print "         -i <maxsize>   (option) Max number of results to return. Default: 1000. Set to \"0\" for all (caution: could be millions)"
-  print "         -j             (option) Show number of search results only (check this first to determine the best -i value for large searches)"
+  print "         -i <maxsize>   (option) Max number of results to return. Default: 10000 (limit imposed by search engine)"
+  print "         -j             (option) Show number of search results."
   print ""
   print " External links list:"
   print "       -x <URL>         List articles containing an external link aka Special:Linksearch"
@@ -385,7 +386,7 @@ function usage_extended() {
 }
 function version() {
   print "Wikiget " G["version"]
-  print "Copyright (C) 2016 User:Green Cardamom (en.wikipedia.org)"
+  print "Copyright (C) 2016-2017 User:GreenC (en.wikipedia.org)"
   print
   print "The MIT License (MIT)"
   print
@@ -526,7 +527,7 @@ function files_verify(files_system,
 #
 # Search list main
 #
-function search(srchstr,    url, results) {
+function search(srchstr,    url, results, a) {
 
         # MediaWiki API:Search
         #  https://www.mediawiki.org/wiki/API:Search
@@ -543,8 +544,12 @@ function search(srchstr,    url, results) {
 
         results = strip(getsearch(url, srchstr))   # Don't uniq, confuses ordering and not needed for search results
 
-        if ( length(results) > 0)
+        l = length(results)
+
+        if (length(results) > 0)
           print results
+        if (split(results,a,"\n") > 9999)
+          print "Warning (wikiget): Search results max out at 10000. See https://www.mediawiki.org/wiki/API:Search" > "/dev/stderr"
         return length(results)
 }
 function getsearch(url, srchstr,   xmlin,xmlout,offset,retrieved) {

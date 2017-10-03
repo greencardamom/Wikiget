@@ -29,8 +29,8 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	         -d             (option) Include search-result snippet in output (default: title only)
 	         -g <target>    (option) Search in "title" or "text" (default: "text")
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
-	         -i <maxsize>   (option) Max number of results to return. Default: 1000. Set to "0" for all (caution: could be millions)
-	         -j             (option) Show number of search results only (check this first to determine the best -i value for large searches)
+	         -i <maxsize>   (option) Max number of results to return. Default: 10000 (limit imposed by search engine)
+	         -j             (option) Show number of search results only.
 
 	 External links list:
 	         -x <URL>       List articles containing an external link aka Special:Linksearch
@@ -97,13 +97,15 @@ Installation
 =============
 Download wikiget.awk
 
+Set executable: chmod 750 wikiget.awk
+
 Optionally create a symlink: ln -s wikiget.awk wikiget
 
-Set executable: chmod 750 wikiget
-
-Change the first line (default: /usr/bin/awk) to location of GNU Awk 4+
+Change the first line (default: /usr/bin/awk) to location of GNU Awk 4+ (use 'which gawk' to see where it is on your system)
 
 Change the "Contact" line to your Wikipedia Username
+
+Requires one of the following to be in the path: wget, curl or lynx (use 'which wget' to see where it is on your system)
 
 Usage
 ==========
@@ -119,9 +121,9 @@ For other methods see [this page](http://mywiki.wooledge.org/BashFAQ/036)
 
 Credits
 ==================
-by User:Green Cardamom (en.wikipedia.org)
+by User:GreenC (en.wikipedia.org)
 
-November 2016
+First version: November 2016
 
 MIT License
 
