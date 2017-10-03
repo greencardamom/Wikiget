@@ -24,7 +24,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2016 by User:Green Cardamom (at en.wikipedia.org)
+# Copyright (c) 2016-2017 by User:GreenC (at en.wikipedia.org)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy      
 # of this software and associated documentation files (the "Software"), to deal   
