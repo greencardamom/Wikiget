@@ -6,92 +6,74 @@ When working with AWB or bots on Wikipedia, a list of target article titles is o
 template (backlinks), or articles edited by a username (user contributions). Wget provides a simple front-end to common API requests.
 
 
-	Wikiget - command-line access to some Wikimedia API functions
+	Wikiget - command-line access to Wikimedia API functions
 
 	Usage:
 
 	 Backlinks:
 	       -b <name>        Backlinks for article, template, userpage, etc..
-	         -t <types>     (option) 1-3 letter string of types of backlinks: n(ormal)t(ranscluded)f(ile). Default: "ntf", See -h for more info 
-
+	         -t <types>     (option) 1-3 letter string of types of backlinks:
+	                         n(ormal)t(ranscluded)f(ile). Default: "ntf".
+	                         See -h for more info 
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	
 	 User contributions:
 	       -u <username>    User contributions
 	         -s <starttime> Start time in YMD format (-s 20150101). Required with -u
-	         -e <endtime>   End time in YMD format (-e 20151231). If same as -s does 24hr range. Required with -u
-	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
-
+	         -e <endtime>   End time in YMD format (-e 20151231). If same as -s,
+	                         does 24hr range. Required with -u
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	
 	 Category list:
 	       -c <category>    List articles in a category
-	         -q <types>     (option) 1-3 letter string of types of links: p(age)s(ubcat)f(ile). Default: "p", See -h for more info 
-
+	         -q <types>     (option) 1-3 letter string of types of links: 
+	                         p(age)s(ubcat)f(ile). Default: "p"
+	
 	 Search-result list:
 	       -a <search>      List of articles containing a search string
-	         -d             (option) Include search-result snippet in output (default: title only)
-	         -g <target>    (option) Search in "title" or "text" (default: "text")
-	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
-	         -i <maxsize>   (option) Max number of results to return. Default: 10000 (limit imposed by search engine)
-	         -j             (option) Show number of search results only.
-
+	                         See docs https://www.mediawiki.org/wiki/Help:CirrusSearch
+	         -d             (option) Include search-result snippet in output (def: title)
+	         -g <target>    (option) Search in "title" or "text" (def: "text")
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	         -i <maxsize>   (option) Max number of results to return. Default: 10000
+	                         10k max limit imposed by search engine
+	         -j             (option) Show number of search results
+	
 	 External links list:
-	         -x <URL>       List articles containing an external link aka Special:Linksearch
-
+	       -x <URL>         List articles containing external link (Special:Linksearch)
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	
 	 Recent changes:
-	         -r             Recent changes (past 30 days) aka Special:RecentChanges. -u or -t required. 
-	         -o <username>  Only list changes made by this user.
-	         -k <tag>       Only list changes tagged with this tag.
-	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples.
-
+	       -r               Recent changes (past 30 days) aka Special:RecentChanges
+	                         Either -o or -t required
+	         -o <username>  Only list changes made by this user
+	         -k <tag>       Only list changes tagged with this tag
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	
 	 Print wiki text:
 	       -w <article>     Print wiki text of article
 	         -p             (option) Plain-text version (strip wiki markup)
-	         -f             (option) Don't follow redirects (print redirect page source)
-
+	         -f             (option) Don't follow redirects (print redirect page)
+	
 	 Global options:
-	       -l <language>    Wikipedia language code (default: en). See https://en.wikipedia.org/wiki/List_of_Wikipedias
-	       -m <#>           API maxlag value (default: 5). See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter
+	       -l <language>    Wikipedia language code (default: en)
+	                         See https://en.wikipedia.org/wiki/List_of_Wikipedias
+	       -m <#>           API maxlag value (default: 5)
+	                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter
+	       -y               Print debugging to stderr (show URLs sent to API)
 	       -V               Version and copyright
 	       -h               Help with examples
-
-	Examples:
-
-	 Backlinks:
-	   wikiget -b "User:Jimbo Wales"                                  (backlinks for a User: showing all link types ("ntf"))
-	   wikiget -b "User:Jimbo Wales" -t nt                            (backlinks for a User: showing normal and transcluded links)
-	   wikiget -b "Template:Gutenberg author" -t t                    (backlinks for a Template: showing transcluded links)
-	   wikiget -b "File:Justforyoucritter.jpg" -t f                   (backlinks for a File: showing file links)
-	   wikiget -b "Paris (Idaho)" -l fr                               (backlinks for article "Paris (Idaho)" on the French Wiki)
-
-	 User contributions:
-	   wikiget -u "User:Jimbo Wales" -s 20010910 -e 20010912          (show all edits from 9/10-9/12 on 2001)
-	   wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010911          (show all edits during the 24hrs of 9/11)
-	   wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 0     (articles only)
-	   wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 1     (talk pages only)
-	   wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n "0|1" (talk and articles only)
-	    -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
-
-	 Category list:
-	   wikiget -c "Category:1900 births"              (list pages in a category)
-	   wikiget -c "Category:Dead people" -q s         (list subcats in a category)
-	   wikiget -c "Category:Dead people" -q sp        (list subcats and pages in a category)
-
-	 Search-result list:
-	   wikiget -a "Jethro Tull"                       (list article texts containing a search string)
-	   wikiget -a "Jethro Tull" -g title              (list article titles containing a search string)
-	   wikiget -a John -i 50                          (list first 50 articles containing a search string)
-	   wikiget -a John -i 50 -d                       (include snippet of text containing the search string)
-	   wikiget -a "Barleycorn" -n "0|1"               (search talk and articles only)
-	    -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
-
-	 External link list:
-	   wikiget -x "news.yahoo.com"                    (list articles containing a URL that contains this)
-
-	 Recent changes:
-	   wikiget -r -k "OAuth CID: 678"                 (list recent changes tagged with this tag)
-
-	 Print wiki text:
-	   wikiget -w "Paris"                             (print wiki text of article "Paris" on the English Wiki)
-	   wikiget -w "China" -p -l fr                    (print plain-text of article "China" on the French Wiki)
-
+	
 
 Installation
 =============
@@ -103,7 +85,7 @@ Optionally create a symlink: ln -s wikiget.awk wikiget
 
 Change the first line (default: /usr/bin/awk) to location of GNU Awk 4+ (use 'which gawk' to see where it is on your system)
 
-Change the "Contact" line to your Wikipedia Username
+Change the "Contact" line to your Wikipedia Username (optionally or leave blank)
 
 Requires one of the following to be in the path: wget, curl or lynx (use 'which wget' to see where it is on your system)
 

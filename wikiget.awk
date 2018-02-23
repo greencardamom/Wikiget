@@ -6,6 +6,9 @@
 
 # Changes in reverse chronological order
 #
+# 0.70 Feb 21 2018 - add -y debug option
+#                    add -n option when using -b
+#                    help display changed to ~80 col width
 # 0.62 Oct 03      - -a max's out at 10000
 # 0.61 Apr 14      - fix -r (rccontinue) 
 # 0.60 Mar 17      - add -r option
@@ -47,15 +50,17 @@
 
 BEGIN {
 
-  Contact = "User:Green_Cardamom (en)"                        # Your contact info - informational only for API Agent string
+# Contact = "User:GreenC (en)"                                # Your contact info - informational only for API Agent string. Optional.
+  Contact = ""                                
+
   G["program"] = "Wikiget"
-  G["version"] = "0.62"
+  G["version"] = "0.70"
   G["agent"] = Program " " G["version"] " " Contact
   G["maxlag"] = "5"                                           # Wikimedia API max lag default
   G["lang"] = "en"                                            # Wikipedia language default
                                  
-  setup("wget curl lynx")                                     # Use wget, curl or lynx - searching PATH in this order
-  Optind = Opterr = 1 
+  setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
+  Optind = Opterr = 1                                         #  They all achieve the same thing just need one 
   parsecommandline()
   processarguments()
 
@@ -68,7 +73,7 @@ BEGIN {
 #
 function parsecommandline(c, opts) {
 
-  while ((c = getopt(ARGC, ARGV, "rhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:")) != -1) {
+  while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:")) != -1) {
       opts++
       if(c == "h") {
         usage()
@@ -144,6 +149,8 @@ function parsecommandline(c, opts) {
         Arguments["maxlag"] = verifyval(Optarg)
       if(c == "l")                 #  -l <lang>       Language code, default set in BEGIN{} section
         Arguments["lang"] = verifyval(Optarg)
+      if(c == "y")                 #  -y              Show debugging info to stderr
+        Arguments["debug"] = 1
       if(c == "V") {               #  -V              Version and copyright info.
         version()
         exit
@@ -232,6 +239,10 @@ function processarguments(  c,a,i) {
   else
     G["cattypes"] = "p"
 
+  if(Arguments["debug"])                                    # Enable debugging
+    G["debug"] = 1
+
+  # ________________________________________ #
 
   if(Arguments["main_c"] == "b") {                          # backlinks
     if ( entity_exists(Arguments["main"]) ) {
@@ -300,44 +311,65 @@ function usage() {
   print ""
   print " Backlinks:"
   print "       -b <name>        Backlinks for article, template, userpage, etc.."
-  print "         -t <types>     (option) 1-3 letter string of types of backlinks: n(ormal)t(ranscluded)f(ile). Default: \"ntf\", See -h for more info "
+  print "         -t <types>     (option) 1-3 letter string of types of backlinks:" 
+  print "                         n(ormal)t(ranscluded)f(ile). Default: \"ntf\"."
+  print "                         See -h for more info "
+  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)" 
+  print "                         Only list pages in this namespace. Default: 0"
+  print "                         See -h for NS codes and examples"
   print ""
   print " User contributions:"
   print "       -u <username>    User contributions"
   print "         -s <starttime> Start time in YMD format (-s 20150101). Required with -u"
-  print "         -e <endtime>   End time in YMD format (-e 20151231). If same as -s does 24hr range. Required with -u"
-  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
+  print "         -e <endtime>   End time in YMD format (-e 20151231). If same as -s," 
+  print "                         does 24hr range. Required with -u"
+  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+  print "                         Only list pages in this namespace. Default: 0"
+  print "                         See -h for NS codes and examples"
   print ""
   print " Category list:"
   print "       -c <category>    List articles in a category"
-  print "         -q <types>     (option) 1-3 letter string of types of links: p(age)s(ubcat)f(ile). Default: \"p\", See -h for more info "
+  print "         -q <types>     (option) 1-3 letter string of types of links: "
+  print "                         p(age)s(ubcat)f(ile). Default: \"p\""
   print ""
   print " Search-result list:"
   print "       -a <search>      List of articles containing a search string"
-  print "         -d             (option) Include search-result snippet in output (default: title only)"
-  print "         -g <target>    (option) Search in \"title\" or \"text\" (default: \"text\")"
-  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
-  print "         -i <maxsize>   (option) Max number of results to return. Default: 10000 (limit imposed by search engine)"
-  print "         -j             (option) Show number of search results."
+  print "                         See docs https://www.mediawiki.org/wiki/Help:CirrusSearch"
+  print "         -d             (option) Include search-result snippet in output (def: title)"
+  print "         -g <target>    (option) Search in \"title\" or \"text\" (def: \"text\")"
+  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+  print "                         Only list pages in this namespace. Default: 0"
+  print "                         See -h for NS codes and examples"
+  print "         -i <maxsize>   (option) Max number of results to return. Default: 10000"
+  print "                         10k max limit imposed by search engine"
+  print "         -j             (option) Show number of search results"
   print ""
   print " External links list:"
-  print "       -x <URL>         List articles containing an external link aka Special:Linksearch"
-  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
+  print "       -x <URL>         List articles containing external link (Special:Linksearch)"
+  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+  print "                         Only list pages in this namespace. Default: 0"
+  print "                         See -h for NS codes and examples"
   print ""
   print " Recent changes:"
-  print "       -r               Recent changes (past 30 days) aka Special:RecentChanges. Either -o or -t required. "
-  print "         -o <username>  Only list changes made by this user."
-  print "         -k <tag>       Only list changes tagged with this tag."
-  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace. See -h for codes and examples."
+  print "       -r               Recent changes (past 30 days) aka Special:RecentChanges" 
+  print "                         Either -o or -t required"
+  print "         -o <username>  Only list changes made by this user"
+  print "         -k <tag>       Only list changes tagged with this tag"
+  print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+  print "                         Only list pages in this namespace. Default: 0"
+  print "                         See -h for NS codes and examples"
   print ""
   print " Print wiki text:"
   print "       -w <article>     Print wiki text of article"
   print "         -p             (option) Plain-text version (strip wiki markup)"
-  print "         -f             (option) Don't follow redirects (print redirect page source)"
+  print "         -f             (option) Don't follow redirects (print redirect page)"
   print ""
   print " Global options:"
-  print "       -l <language>    Wikipedia language code (default: " G["lang"] "). See https://en.wikipedia.org/wiki/List_of_Wikipedias"
-  print "       -m <#>           API maxlag value (default: " G["maxlag"] "). See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
+  print "       -l <language>    Wikipedia language code (default: " G["lang"] ")" 
+  print "                         See https://en.wikipedia.org/wiki/List_of_Wikipedias"
+  print "       -m <#>           API maxlag value (default: " G["maxlag"] ")"
+  print "                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
+  print "       -y               Print debugging to stderr (show URLs sent to API)"
   print "       -V               Version and copyright"
   print "       -h               Help with examples"
   print ""
@@ -366,11 +398,12 @@ function usage_extended() {
   print "   wikiget -c \"Category:Dead people\" -q sp        (list subcats and pages in a category)"
   print ""
   print " Search-result list:"
-  print "   wikiget -a \"Jethro Tull\"                       (list article texts containing a search string)"
   print "   wikiget -a \"Jethro Tull\" -g title              (list article titles containing a search string)"
   print "   wikiget -a John -i 50                          (list first 50 articles containing a search string)"
   print "   wikiget -a John -i 50 -d                       (include snippet of text containing the search string)"
   print "   wikiget -a \"Barleycorn\" -n \"0|1\"               (search talk and articles only)"
+  print "   wikiget -a \"user: subpageof:GreenC\"            (list subpages of User:GreenC)"
+  print "    search docs: https://www.mediawiki.org/wiki/Help:CirrusSearch"
   print "    -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces"
   print ""
   print " External link list:"
@@ -743,8 +776,6 @@ function rechanges(username, tag,      url, results, entity) {
 
         url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
 
-        print url
-
         results = uniq( getrechanges(url, entity) )
 
         if ( length(results) > 0) 
@@ -782,7 +813,7 @@ function ucontribs(entity,sdate,edate,      url, results) {
         if(entity !~ /^[Uu]ser[:]/)
           entity = "User:" entity
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" G["namespace"] "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
 
         results = uniq( getucontribs(url, entity, sdate, edate) )
 
@@ -799,7 +830,7 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         continuecode = getcontinue(jsonin,"uccontinue")
 
         while ( continuecode ) {
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" G["namespace"] "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"uccontinue")
@@ -819,18 +850,18 @@ function backlinks(entity,      url, blinks) {
         #  https://www.mediawiki.org/wiki/API:Backlinks
 
         if(G["bltypes"] ~ /n/) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
           blinks = getbacklinks(url, entity, "blcontinue") # normal backlinks
         }
 
         if ( entity ~ /^[Tt]emplate[:]/ && G["bltypes"] ~ /t/) {    # transclusion backlinks
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&continue=&eilimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
             if(length(blinks) > 0)
               blinks = blinks "\n" getbacklinks(url, entity, "eicontinue")
             else
               blinks = getbacklinks(url, entity, "eicontinue")
         } else if ( entity ~ /^[Ff]ile[:]/ && G["bltypes"] ~ /f/) { # file backlinks
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
             if(length(blinks) > 0)
               blinks = blinks "\n" getbacklinks(url, entity, "iucontinue")
             else
@@ -855,11 +886,11 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
         while ( continuecode ) {
 
             if ( method == "eicontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
             if ( method == "iucontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
             if ( method == "blcontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -952,6 +983,9 @@ function sys2var(command        ,catch, weight, ship) {
 # Webpage to variable. url is assumed to be percent encoded.
 #
 function http2var(url) {
+
+        if(G["debug"])
+          print url > "/dev/stderr"
 
         if(G["wta"] == "wget")
           return sys2var("wget --no-check-certificate --user-agent=\"" G["agent"] "\" -q -O- -- " shquote(url) )
