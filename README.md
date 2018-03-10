@@ -73,8 +73,77 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	       -y               Print debugging to stderr (show URLs sent to API)
 	       -V               Version and copyright
 	       -h               Help with examples
+		
 	
+	Examples:
 
+	 Backlinks:
+	   for a User: showing all link types ("ntf")
+	     wikiget -b "User:Jimbo Wales"
+	   for a User: showing normal and transcluded links
+	     wikiget -b "User:Jimbo Wales" -t nt
+	   for a Template: showing transcluded links
+	     wikiget -b "Template:Gutenberg author" -t t
+	   for a File: showing file links
+	     wikiget -b "File:Justforyoucritter.jpg" -t f
+	   for article "Paris (Idaho)" on the French Wiki
+	     wikiget -b "Paris (Idaho)" -l fr
+	
+	 User contributions:
+	   show all edits from 9/10-9/12 on 2001
+	     wikiget -u "User:Jimbo Wales" -s 20010910 -e 20010912
+	   show all edits during the 24hrs of 9/11
+	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010911
+	   articles only
+	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 0
+	   talk pages only
+	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 1
+	   talk and articles only
+	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n "0|1"
+	
+	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
+	
+	 Category list:
+	   pages in a category
+	     wikiget -c "Category:1900 births"
+	   subcats in a category
+	     wikiget -c "Category:Dead people" -q s
+	   subcats and pages in a category
+	     wikiget -c "Category:Dead people" -q sp
+	
+	 Search-result list:
+	   article titles containing a search
+	     wikiget -a "Jethro Tull" -g title
+	   first 50 articles containing a search
+	     wikiget -a John -i 50
+	   include snippet of text containing the search string
+	     wikiget -a John -i 50 -d
+	   search talk and articles only
+	     wikiget -a "Barleycorn" -n "0|1"
+	   regex search, include debug output
+	     wikiget -a "insource:/ia[^.]*[.]us[.]/" -y
+	   subpages of User:GreenC
+	     wikiget -a "user: subpageof:GreenC"
+	
+	   search docs: https://www.mediawiki.org/wiki/Help:CirrusSearch
+	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
+	
+	 External link list:
+	   list articles containing a URL with this domain
+	     wikiget -x "news.yahoo.com"
+	
+	 Recent changes:
+	   recent changes in last 30 days tagged with this ID
+	     wikiget -r -k "OAuth CID: 678"
+	
+	 Print wiki text:
+	   wiki text of article "Paris" on the English Wiki
+	     wikiget -w "Paris"
+	   plain text of article "China" on the French Wiki
+	     wikiget -w "China" -p -l fr
+	   wiki text of article on Wikinews
+	     wikiget -w "Healthy cloned monkeys born in Shanghai" -z wikinews
+	
 Installation
 =============
 Download wikiget.awk
