@@ -6,10 +6,11 @@
 
 # Changes in reverse chronological order
 #
+# 0.71 Mar 06      - add -z project option
 # 0.70 Feb 21 2018 - add -y debug option
 #                    add -n option when using -b
-#                    help display changed to ~80 col width
-# 0.62 Oct 03      - -a max's out at 10000
+#                    help display changed to ~80 column 
+# 0.62 Oct 03 2017 - -a max's out at 10000
 # 0.61 Apr 14      - fix -r (rccontinue) 
 # 0.60 Mar 17      - add -r option
 # 0.51 Mar 13 2017 - add -n option when using -x
@@ -54,10 +55,11 @@ BEGIN {
   Contact = ""                                
 
   G["program"] = "Wikiget"
-  G["version"] = "0.70"
+  G["version"] = "0.71"
   G["agent"] = Program " " G["version"] " " Contact
-  G["maxlag"] = "5"                                           # Wikimedia API max lag default
-  G["lang"] = "en"                                            # Wikipedia language default
+  G["maxlag"] = "5"                                           # Wiki API max lag default
+  G["lang"] = "en"                                            # Wiki language default eg. en, fr, sv etc..
+  G["project"] = "wikipedia"                                  # Wiki project default eg. wikinews, wikisource etc..
                                  
   setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
   Optind = Opterr = 1                                         #  They all achieve the same thing just need one 
@@ -73,7 +75,7 @@ BEGIN {
 #
 function parsecommandline(c, opts) {
 
-  while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:")) != -1) {
+  while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:")) != -1) {
       opts++
       if(c == "h") {
         usage()
@@ -149,6 +151,8 @@ function parsecommandline(c, opts) {
         Arguments["maxlag"] = verifyval(Optarg)
       if(c == "l")                 #  -l <lang>       Language code, default set in BEGIN{} section
         Arguments["lang"] = verifyval(Optarg)
+      if(c == "z")                 #  -z <project>    Project name, default set in BEGIN{} section
+        Arguments["project"] = verifyval(Optarg)
       if(c == "y")                 #  -y              Show debugging info to stderr
         Arguments["debug"] = 1
       if(c == "V") {               #  -V              Version and copyright info.
@@ -170,6 +174,10 @@ function processarguments(  c,a,i) {
 
   if(length(Arguments["lang"]) > 0)                                # Check options, set defaults
     G["lang"] = Arguments["lang"]
+    # default set in BEGIN{}
+
+  if(length(Arguments["project"]) > 0)                             # Check options, set defaults
+    G["project"] = Arguments["project"]
     # default set in BEGIN{}
 
   if(isanumber(Arguments["maxlag"])) 
@@ -365,8 +373,9 @@ function usage() {
   print "         -f             (option) Don't follow redirects (print redirect page)"
   print ""
   print " Global options:"
-  print "       -l <language>    Wikipedia language code (default: " G["lang"] ")" 
+  print "       -l <language>    Wiki language code (default: " G["lang"] ")" 
   print "                         See https://en.wikipedia.org/wiki/List_of_Wikipedias"
+  print "       -z <project>     Wiki project (default: " G["project"] ")"
   print "       -m <#>           API maxlag value (default: " G["maxlag"] ")"
   print "                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
   print "       -y               Print debugging to stderr (show URLs sent to API)"
@@ -419,7 +428,7 @@ function usage_extended() {
 }
 function version() {
   print "Wikiget " G["version"]
-  print "Copyright (C) 2016-2017 User:GreenC (en.wikipedia.org)"
+  print "Copyright (C) 2016-2018 User:GreenC (en.wikipedia.org)"
   print
   print "The MIT License (MIT)"
   print
@@ -573,7 +582,7 @@ function search(srchstr,    url, results, a) {
         if(G["searchtarget"] ~ /title/)  # Use this instead of &srwhat
           srchstr = "intitle:" srchstr   # See https://www.mediawiki.org/wiki/API_talk:Search#title_search_is_disabled  
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=search&srsearch=" urlencodeawk(srchstr) "&srprop=" urlencodeawk(G["srprop"]) "&srnamespace=" urlencodeawk(G["namespace"]) "&srlimit=50&continue=" urlencodeawk("-||") "&format=xml&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=search&srsearch=" urlencodeawk(srchstr) "&srprop=" urlencodeawk(G["srprop"]) "&srnamespace=" urlencodeawk(G["namespace"]) "&srlimit=50&continue=" urlencodeawk("-||") "&format=xml&maxlag=" G["maxlag"]
 
         results = strip(getsearch(url, srchstr))   # Don't uniq, confuses ordering and not needed for search results
 
@@ -601,7 +610,7 @@ function getsearch(url, srchstr,   xmlin,xmlout,offset,retrieved) {
           return trimxmlout(xmlout, G["maxsearch"])
    
         while( offset) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=search&srsearch=" urlencodeawk(srchstr) "&srprop=" urlencodeawk(G["srprop"]) "&srnamespace=" urlencodeawk(G["namespace"]) "&srlimit=50&continue=" urlencodeawk("-||") "&format=xml&maxlag=" G["maxlag"] "&sroffset=" offset
+          url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=search&srsearch=" urlencodeawk(srchstr) "&srprop=" urlencodeawk(G["srprop"]) "&srnamespace=" urlencodeawk(G["namespace"]) "&srlimit=50&continue=" urlencodeawk("-||") "&format=xml&maxlag=" G["maxlag"] "&sroffset=" offset
           xmlin = http2var(url)
           xmlout = xmlout "\n" parsexmlsearch(xmlin)
           offset = getoffsetxml(xmlin)
@@ -694,7 +703,7 @@ function category(entity,   ct, url, results) {
         ct = strip(ct)
         gsub(/[ ]/,"|",ct)
  
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
 
         results = uniq( getcategory(url, entity) )
 
@@ -710,7 +719,7 @@ function getcategory(url, entity,   jsonin, jsonout, continuecode) {
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin, "cmcontinue")
         while ( continuecode ) {
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
+            url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin, "cmcontinue")
@@ -733,8 +742,12 @@ function xlinks(entity,   ct, url, results) {
         else if(entity ~ /^\/\// ) 
           gsub(/^\/\//,"",entity)
         
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eunamespace=" urlencodeawk(G["namespace"]) "&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+        if(entity ~ /^[*]$/) {
+          entity = ""
+        }
 
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eunamespace=" urlencodeawk(G["namespace"]) "&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+ 
         results = uniq( getxlinks(url, entity) )
 
         if ( length(results) > 0)
@@ -749,7 +762,7 @@ function getxlinks(url, entity,   jsonin, jsonout, offset) {
         jsonout = json2var(jsonin)
         offset = getoffsetjson(jsonin, "euoffset")
         while ( offset ) {
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&euoffset=" offset 
+            url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&euoffset=" offset 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             offset = getoffsetjson(jsonin, "euoffset")
@@ -774,7 +787,7 @@ function rechanges(username, tag,      url, results, entity) {
         else 
           return 0
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
 
         results = uniq( getrechanges(url, entity) )
 
@@ -791,7 +804,7 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode ) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
+          url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
           jsonin = http2var(url)
           jsonout = jsonout "\n" json2var(jsonin)
           continuecode = getcontinue(jsonin,"rccontinue")
@@ -813,7 +826,7 @@ function ucontribs(entity,sdate,edate,      url, results) {
         if(entity !~ /^[Uu]ser[:]/)
           entity = "User:" entity
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
 
         results = uniq( getucontribs(url, entity, sdate, edate) )
 
@@ -830,7 +843,7 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         continuecode = getcontinue(jsonin,"uccontinue")
 
         while ( continuecode ) {
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"uccontinue")
@@ -850,18 +863,18 @@ function backlinks(entity,      url, blinks) {
         #  https://www.mediawiki.org/wiki/API:Backlinks
 
         if(G["bltypes"] ~ /n/) {
-          url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+          url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
           blinks = getbacklinks(url, entity, "blcontinue") # normal backlinks
         }
 
         if ( entity ~ /^[Tt]emplate[:]/ && G["bltypes"] ~ /t/) {    # transclusion backlinks
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
             if(length(blinks) > 0)
               blinks = blinks "\n" getbacklinks(url, entity, "eicontinue")
             else
               blinks = getbacklinks(url, entity, "eicontinue")
         } else if ( entity ~ /^[Ff]ile[:]/ && G["bltypes"] ~ /f/) { # file backlinks
-            url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
             if(length(blinks) > 0)
               blinks = blinks "\n" getbacklinks(url, entity, "iucontinue")
             else
@@ -886,11 +899,11 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
         while ( continuecode ) {
 
             if ( method == "eicontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
             if ( method == "iucontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
             if ( method == "blcontinue" )
-                url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -910,7 +923,7 @@ function wikitextplain(namewiki,   command,f,r,redirurl,xml,i,c,b,k) {
         # MediaWiki API Extension:TextExtracts
         #  https://www.mediawiki.org/wiki/Extension:TextExtracts
 
-        command = "https://" G["lang"] ".wikipedia.org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
+        command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
         f = http2var(command)
         if(length(f) < 5) 
           return ""
@@ -918,11 +931,11 @@ function wikitextplain(namewiki,   command,f,r,redirurl,xml,i,c,b,k) {
           match(f, /[#][ ]{0,}[Rr][Ee][^]]*[]]/, r)
           gsub(/[#][ ]{0,}[Rr][Ee][Dd][Ii][^[]*[[]/,"",r[0])
           redirurl = strip(substr(r[0], 2, length(r[0]) - 2))
-          command = "https://" G["lang"] ".wikipedia.org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(redirurl) 
+          command = "https://" G["lang"] "." G["project"] ".org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(redirurl) 
           xml = http2var(command)
         }
         else {
-          command = "https://" G["lang"] ".wikipedia.org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(namewiki)
+          command = "https://" G["lang"] "." G["project"] ".org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(namewiki)
           xml = http2var(command)
         }
 
@@ -940,7 +953,7 @@ function wikitextplain(namewiki,   command,f,r,redirurl,xml,i,c,b,k) {
 
 function wikitext(namewiki,   command,f,r,redirurl) {
 
-        command = "https://" G["lang"] ".wikipedia.org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
+        command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
         f = http2var(command)
         if(length(f) < 5) 
           return ""
@@ -949,7 +962,7 @@ function wikitext(namewiki,   command,f,r,redirurl) {
           match(f, /[#][ ]{0,}[Rr][Ee][^]]*[]]/, r)
           gsub(/[#][ ]{0,}[Rr][Ee][Dd][Ii][^[]*[[]/,"",r[0])
           redirurl = strip(substr(r[0], 2, length(r[0]) - 2))
-          command = "https://" G["lang"] ".wikipedia.org/w/index.php?title=" urlencodeawk(redirurl) "&action=raw"
+          command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(redirurl) "&action=raw"
           f = http2var(command)
         }
         if(length(f) < 5)
@@ -1119,7 +1132,7 @@ function apierror(input, type,   pre, code) {
 #
 function entity_exists(entity   ,url,jsonin) {
 
-        url = "https://" G["lang"] ".wikipedia.org/w/api.php?action=query&titles=" urlencodeawk(entity) "&format=json"
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&titles=" urlencodeawk(entity) "&format=json"
         jsonin = http2var(url)
         if(jsonin ~ "\"missing\"")
             return 0
