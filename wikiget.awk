@@ -378,6 +378,7 @@ function usage() {
   print "       -l <language>    Wiki language code (default: " G["lang"] ")" 
   print "                         See https://en.wikipedia.org/wiki/List_of_Wikipedias"
   print "       -z <project>     Wiki project (default: " G["project"] ")"
+  print "                         https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects"
   print "       -m <#>           API maxlag value (default: " G["maxlag"] ")"
   print "                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
   print "       -y               Print debugging to stderr (show URLs sent to API)"

@@ -66,8 +66,10 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	         -f             (option) Don't follow redirects (print redirect page)
 	
 	 Global options:
-	       -l <language>    Wikipedia language code (default: en)
+	       -l <language>    Wiki language code (default: en)
 	                         See https://en.wikipedia.org/wiki/List_of_Wikipedias
+	       -z <project>     Wiki project (default: wikipedia)
+	                         See https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects
 	       -m <#>           API maxlag value (default: 5)
 	                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter
 	       -y               Print debugging to stderr (show URLs sent to API)
