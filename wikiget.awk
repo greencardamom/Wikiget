@@ -338,7 +338,7 @@ function usage() {
   print "                         See -h for NS codes and examples"
   print ""
   print " Forward-links:"
-  print         -F <name>        Forward-links for article, template, userpage, etc.."
+  print "       -F <name>        Forward-links for article, template, userpage, etc.."
   print ""
   print " User contributions:"
   print "       -u <username>    User contributions"
