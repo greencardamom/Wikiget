@@ -18,6 +18,8 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
+	 Forward-links:
+	       -F <name>        Forward-links for article, template, userpage, etc..
 	
 	 User contributions:
 	       -u <username>    User contributions
@@ -75,8 +77,8 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	       -y               Print debugging to stderr (show URLs sent to API)
 	       -V               Version and copyright
 	       -h               Help with examples
-		
-	
+
+
 	Examples:
 
 	 Backlinks:

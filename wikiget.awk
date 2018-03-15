@@ -6,6 +6,7 @@
 
 # Changes in reverse chronological order
 #
+# 0.72 Mar 15      - add -F forward-links
 # 0.71 Mar 06      - add -z project option
 #                    extended help display changed to ~80 column
 #                    add regex example to help
@@ -57,7 +58,7 @@ BEGIN {
   Contact = ""                                
 
   G["program"] = "Wikiget"
-  G["version"] = "0.71"
+  G["version"] = "0.72"
   G["agent"] = Program " " G["version"] " " Contact
   G["maxlag"] = "5"                                           # Wiki API max lag default
   G["lang"] = "en"                                            # Wiki language default eg. en, fr, sv etc..
@@ -77,7 +78,7 @@ BEGIN {
 #
 function parsecommandline(c, opts) {
 
-  while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:")) != -1) {
+  while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:")) != -1) {
       opts++
       if(c == "h") {
         usage()
@@ -91,6 +92,11 @@ function parsecommandline(c, opts) {
       }
       if(c == "t") {               #  -t <types>      Types of backlinks ( -t "ntf" )
         Arguments["bltypes"] = verifyval(Optarg)
+      }
+
+      if(c == "F") {               #  -F <entity>     Forward-links for entity ( -F "Example" )
+        Arguments["main"] = verifyval(Optarg)
+        Arguments["main_c"] = "F"
       }
 
       if(c == "c") {               #  -b <entity>     List articles in a category ( -c "Category:1900 births" )
@@ -260,6 +266,9 @@ function processarguments(  c,a,i) {
         errormsg("No backlinks for " Arguments["main"]) 
     }
   }
+  else if(Arguments["main_c"] == "F") {                     # forward-links
+    forlinks(Arguments["main"])
+  }
   else if(Arguments["main_c"] == "c") {                     # categories
     category(Arguments["main"])
   }
@@ -327,6 +336,9 @@ function usage() {
   print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)" 
   print "                         Only list pages in this namespace. Default: 0"
   print "                         See -h for NS codes and examples"
+  print ""
+  print " Forward-links:"
+  print         -F <name>        Forward-links for article, template, userpage, etc.."
   print ""
   print " User contributions:"
   print "       -u <username>    User contributions"
@@ -881,6 +893,26 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         }
 
         return jsonout
+}
+
+# _____________________________ Forward links (-F) ______________________________________________
+
+#
+# Forward Links main 
+#
+function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
+
+        # Parsing wikitext
+        #  https://www.mediawiki.org/wiki/API:Parsing_wikitext
+
+        url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=parse&prop=" urlencodeawk("links") "&page=" urlencodeawk(entity) "&format=json&utf8=1&maxlag=" G["maxlag"]
+        jsonin = http2var(url)
+        if(apierror(jsonin, "json") > 0)
+          return ""
+        jsonout = json2var(jsonin)
+        if ( length(jsonout) > 0) 
+          print jsonout
+        return length(jsonout)       
 }
 
 # _____________________________ Backlinks (-b) ______________________________________________
