@@ -6,6 +6,7 @@
 
 # Changes in reverse chronological order
 #
+# 0.73 Mar 23      - fix bug in -w -p
 # 0.72 Mar 15      - add -F forward-links
 # 0.71 Mar 06      - add -z project option
 #                    extended help display changed to ~80 column
@@ -58,7 +59,7 @@ BEGIN {
   Contact = ""                                
 
   G["program"] = "Wikiget"
-  G["version"] = "0.72"
+  G["version"] = "0.73"
   G["agent"] = Program " " G["version"] " " Contact
   G["maxlag"] = "5"                                           # Wiki API max lag default
   G["lang"] = "en"                                            # Wiki language default eg. en, fr, sv etc..
@@ -981,7 +982,7 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
 #
 # Print wiki text (-w) with the plain text option (-p)
 #
-function wikitextplain(namewiki,   command,f,r,redirurl,xml,i,c,b,k) {
+function wikitextplain(namewiki,   command,f,r,redirurl,xmlin,i,c,b,k) {
 
         # MediaWiki API Extension:TextExtracts
         #  https://www.mediawiki.org/wiki/Extension:TextExtracts
@@ -995,17 +996,18 @@ function wikitextplain(namewiki,   command,f,r,redirurl,xml,i,c,b,k) {
           gsub(/[#][ ]{0,}[Rr][Ee][Dd][Ii][^[]*[[]/,"",r[0])
           redirurl = strip(substr(r[0], 2, length(r[0]) - 2))
           command = "https://" G["lang"] "." G["project"] ".org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(redirurl) 
-          xml = http2var(command)
+          xmlin = http2var(command)
         }
         else {
           command = "https://" G["lang"] "." G["project"] ".org/w/api.php?format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(namewiki)
-          xml = http2var(command)
+          xmlin = http2var(command)
         }
 
-        if(apierror(xmlin, "xml") > 0)
+        if(apierror(xmlin, "xml") > 0) {
           return ""
+        }
         else {
-          c = split(convertxml(xml), b, "<extract[^>]*>")
+          c = split(convertxml(xmlin), b, "<extract[^>]*>")
           i = 1
           while(i++ < c) {
             k = substr(b[i], 1, match(b[i], "</extract>") - 1)
@@ -1063,7 +1065,7 @@ function http2var(url) {
         if(G["debug"])
           print url > "/dev/stderr"
 
-        if(G["wta"] == "wget")
+        if(G["wta"] == "wget") 
           return sys2var("wget --no-check-certificate --user-agent=\"" G["agent"] "\" -q -O- -- " shquote(url) )
         else if(G["wta"] == "curl")
           return sys2var("curl -L -s -k --user-agent \"" G["agent"] "\" -- " shquote(url) )
