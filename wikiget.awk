@@ -6,6 +6,8 @@
 
 # Changes in reverse chronological order
 #
+# 0.75 May 01      - fix -u (remove User: prefix from entity)
+# 0.74 Apr 26      - add &#10; to convertxml() (line-feed)
 # 0.73 Mar 23      - fix bug in -w -p
 # 0.72 Mar 15      - add -F forward-links
 # 0.71 Mar 06      - add -z project option
@@ -342,7 +344,7 @@ function usage() {
   print "       -F <name>        Forward-links for article, template, userpage, etc.."
   print ""
   print " User contributions:"
-  print "       -u <username>    User contributions"
+  print "       -u <username>    Username without User: prefix"
   print "         -s <starttime> Start time in YMD format (-s 20150101). Required with -u"
   print "         -e <endtime>   End time in YMD format (-e 20151231). If same as -s," 
   print "                         does 24hr range. Required with -u"
@@ -416,15 +418,15 @@ function usage_extended() {
   print ""
   print " User contributions:"
   print "   show all edits from 9/10-9/12 on 2001"
-  print "     wikiget -u \"User:Jimbo Wales\" -s 20010910 -e 20010912" 
+  print "     wikiget -u \"Jimbo Wales\" -s 20010910 -e 20010912" 
   print "   show all edits during the 24hrs of 9/11" 
-  print "     wikiget -u \"User:Jimbo Wales\" -s 20010911 -e 20010911"  
+  print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010911"  
   print "   articles only"
-  print "     wikiget -u \"User:Jimbo Wales\" -s 20010911 -e 20010930 -n 0"
+  print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010930 -n 0"
   print "   talk pages only"
-  print "     wikiget -u \"User:Jimbo Wales\" -s 20010911 -e 20010930 -n 1"
+  print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010930 -n 1"
   print "   talk and articles only"
-  print "     wikiget -u \"User:Jimbo Wales\" -s 20010911 -e 20010930 -n \"0|1\""
+  print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010930 -n \"0|1\""
   print ""
   print "   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces"
   print ""
@@ -864,11 +866,11 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
 #
 function ucontribs(entity,sdate,edate,      url, results) {
 
-        # MediaWiki namespace codes
-        #  https://www.mediawiki.org/wiki/Extension_default_namespaces
+        # API:Usercontribs 
+        # https://www.mediawiki.org/wiki/API:Usercontribs
 
-        if(entity !~ /^[Uu]ser[:]/)
-          entity = "User:" entity
+        # API stopped working with User: prefix sometime in April 2018
+        sub(/^[Uu]ser[:]/, "", entity)
 
         url = "https://" G["lang"] "." G["project"] ".org/w/api.php?action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
 
@@ -1149,6 +1151,7 @@ function convertxml(str,   safe) {
         gsub(/&quot;/,"\"",safe)
         gsub(/&amp;/,"\\&",safe)
         gsub(/&#039;/,"'",safe)
+        gsub(/&#10;/,"",safe)
         return safe
 }
 

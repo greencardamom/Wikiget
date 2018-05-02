@@ -22,7 +22,7 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	       -F <name>        Forward-links for article, template, userpage, etc..
 	
 	 User contributions:
-	       -u <username>    User contributions
+	       -u <username>    Username without User: prefix
 	         -s <starttime> Start time in YMD format (-s 20150101). Required with -u
 	         -e <endtime>   End time in YMD format (-e 20151231). If same as -s,
 	                         does 24hr range. Required with -u
@@ -95,15 +95,15 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	
 	 User contributions:
 	   show all edits from 9/10-9/12 on 2001
-	     wikiget -u "User:Jimbo Wales" -s 20010910 -e 20010912
+	     wikiget -u "Jimbo Wales" -s 20010910 -e 20010912
 	   show all edits during the 24hrs of 9/11
-	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010911
+	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010911
 	   articles only
-	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 0
+	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010930 -n 0
 	   talk pages only
-	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n 1
+	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010930 -n 1
 	   talk and articles only
-	     wikiget -u "User:Jimbo Wales" -s 20010911 -e 20010930 -n "0|1"
+	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010930 -n "0|1"
 	
 	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
 	
