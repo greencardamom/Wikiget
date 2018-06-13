@@ -4,12 +4,12 @@ Wikiget is a Unix command-line tool to retrieve lists of article titles from Wik
 
 Features:
 
-* When working with AWB or bots on Wikipedia, a list of target article titles is often needed. For example all articles in a category, articles that use a 
+* A list of target article titles is often needed for bot makers. For example all articles in a category, articles that use a 
 template (backlinks), or articles edited by a username (user contributions). Wget provides a simple front-end to common API requests.
 
 * Search Wikipedia from the command-line with the option for regex and snippits output.
 
-* Editing Wikipedia couldn't be easier with the -E option. See EDITSETUP for authentication setup.
+* Editing Wikipedia couldn't be easier with the -E option. See EDITSETUP for authentication.
 
 Wikiget options and examples:
 
@@ -189,13 +189,13 @@ Requires one of the following to be in the path: wget, curl or lynx (use 'which 
 
 Usage
 ==========
-The advantage of working in Unix is access to other tools. 
+The advantage of working in Unix is access to other tools. Some examples follow.
 
 A search-replace bot:
 
 	wikiget -w "Wikipedia" | sed 's/Wikipedia/Wikipodium/g' | wikiget -E "Wikipedia" -S "Change to Wikipodium" -P STDIN
 
-Deatil: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E). This can be added to a for-loop that operates on a list of articles. 
+Expand: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E). This can be added to a for-loop that operates on a list of articles. 
 
 To find the intersection of two categories (articles that exist in both), download the category lists using the -c option, then use grep to find the intersection:
 
@@ -213,7 +213,7 @@ First version: November 2016
 
 MIT License
 
-Want to use MediaWiki API with Awk? Check out 'MediaWiki Awk API Library'
+Wikiget is part of the BotWikiAwk framework of tools and libraries for building and running bots on Wikipedia
 
-https://github.com/greencardamom/MediaWikiAwkAPI
+https://github.com/greencardamom/BotWikiAwk
 
