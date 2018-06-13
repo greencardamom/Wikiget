@@ -1,0 +1,38 @@
+# Changes in reverse chronological order
+#
+# 1.0  Jun 12      - add edit functions -E, -R and -I
+#                    add OAuth 
+#                    add new functions (randomnumber,splitx,etc)
+#                    add new JSON library
+#                    update library functions
+#                    code spacing
+#
+# 0.76 Jun 07      - fix API url (define only once)
+#                    fix bug in files_verify()
+#                    add asplit() and _defaults
+# 0.75 May 01      - fix -u (remove User: prefix from entity)
+# 0.74 Apr 26      - add &#10; to convertxml() (line-feed)
+# 0.73 Mar 23      - fix bug in -w -p
+# 0.72 Mar 15      - add -F forward-links
+# 0.71 Mar 06      - add -z project option
+#                    extended help display changed to ~80 column
+#                    add regex example to help
+# 0.70 Feb 21 2018 - add -y debug option
+#                    add -n option when using -b
+#                    help display changed to ~80 column
+# 0.62 Oct 03 2017 - -a max's out at 10000
+# 0.61 Apr 14      - fix -r (rccontinue)
+# 0.60 Mar 17      - add -r option
+# 0.51 Mar 13 2017 - add -n option when using -x
+# 0.50 Dec 15 2016 - add -x (external link search)
+# 0.47 Nov 30      - fix &utf8=1 in API for usercontributions and categories
+# 0.46 Nov 30      - fix -g (for +50 results)
+#                    add stdErr()
+# 0.45 Nov 29      - fix -g (search title or article)
+# 0.40 Nov 28      - add -a (search and sub-options)
+#                    add apierror() (check for API errors)
+# 0.30 Nov 27      - converted -c and -u to JSON
+# 0.20 Nov 26      - add -t (backlink types)
+#                    add -q (category link types)
+# 0.10 Nov 24 2016 - initial release
+

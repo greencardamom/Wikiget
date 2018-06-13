@@ -1,0 +1,25 @@
+The edit (-E) feature requires an account with bot-flag permissions and OAuth owner-only consumer key/secrets
+
+. If you already have a bot account and OAuth owner-only consumer keys/secrets skip to the last step.
+
+. Obtain bot-flag from an administrator. Usually this is done through WP:BRFA 
+
+. Login to https://meta.wikimedia.org with the bot userid
+
+. If the userid is new and doesn't have Confirmed user permissions, apply for it in two places:
+
+       enwiki: Wikipedia:Requests for permissions/Confirmed
+       meta  : https://meta.wikimedia.org/wiki/Steward_requests/Miscellaneous
+
+. OAuth owner-only consumer registration:
+
+       https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose
+        . Check the box "This consumer is for use only by.."
+        . IP Ranges and Public RSA Key should be left empty
+        . Check the box for edit permissions
+       If you ever need to add/change permissions, the old key/secrets are discarded and new ones registered
+
+. Add the provided Keys and Secrets to wikiget. Search wikiget.awk for 'OAuth credentials' shows where to add them.
+
+
+

@@ -1,10 +1,17 @@
 Wikiget
 ===================
-Wikiget is a Unix command-line tool to retrieve lists of article titles from Wikipedia.
+Wikiget is a Unix command-line tool to retrieve lists of article titles from Wikipedia, search Wikipedia, edit Wikipedia and more.
 
-When working with AWB or bots on Wikipedia, a list of target article titles is often needed. For example all articles in a category, articles that use a 
+Features:
+
+* When working with AWB or bots on Wikipedia, a list of target article titles is often needed. For example all articles in a category, articles that use a 
 template (backlinks), or articles edited by a username (user contributions). Wget provides a simple front-end to common API requests.
 
+* Search Wikipedia from the command-line with the option for regex and snippits output.
+
+* Editing Wikipedia couldn't be easier with the -E option. See EDITSETUP for authentication setup.
+
+Wikiget options and examples:
 
 	Wikiget - command-line access to Wikimedia API functions
 
@@ -66,6 +73,17 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	       -w <article>     Print wiki text of article
 	         -p             (option) Plain-text version (strip wiki markup)
 	         -f             (option) Don't follow redirects (print redirect page)
+	
+	 Edit page (experimental):
+	       -E <title>       Edit a page with this title. Requires -S and -P
+	         -S <summary>   Edit summary
+	         -P <filename>  Page content filename. If "STDIN" read from stdin
+	                         See EDITSETUP for authentication instructions
+	
+	       -R <page>        Move from page name. Requires -T
+	         -T <page>      Move to page name
+	
+	       -I               Show OAuth userinfo
 	
 	 Global options:
 	       -l <language>    Wiki language code (default: en)
@@ -148,6 +166,13 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 	   wiki text of article on Wikinews
 	     wikiget -w "Healthy cloned monkeys born in Shanghai" -z wikinews
 	
+	 Edit page:
+	   Edit "Paris" by uploading new content from the local file paris.ws
+	     wikiget -E "Paris" -S "Fix spelling" -P "/home/paris.ws"
+	   Input via stdin
+	     cat /home/paris.ws | wikiget -E "Paris" -S "Fix spelling" -P STDIN
+	
+
 Installation
 =============
 Download wikiget.awk
@@ -156,23 +181,29 @@ Set executable: chmod 750 wikiget.awk
 
 Optionally create a symlink: ln -s wikiget.awk wikiget
 
-Change the first line (default: /usr/bin/awk) to location of GNU Awk 4+ (use 'which gawk' to see where it is on your system)
+Change hashbang (first line) to location of GNU Awk 4+  - use 'which gawk' to see where it is on your system.
 
-Change the "Contact" line to your Wikipedia Username (optionally or leave blank)
+Change the "Contact" line to your Wikipedia Username (optional or leave blank)
 
 Requires one of the following to be in the path: wget, curl or lynx (use 'which wget' to see where it is on your system)
 
 Usage
 ==========
-The advantage of working in Unix is access to other tools. For example to find the intersection of two categories (the articles that exist in both), download the two category lists using the -c option, then use grep to find the intersection:
+The advantage of working in Unix is access to other tools. 
+
+A search-replace bot:
+
+	wikiget -w "Wikipedia" | sed 's/Wikipedia/Wikipodium/g' | wikiget -E "Wikipedia" -S "Change to Wikipodium" -P STDIN
+
+Deatil: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E). This can be added to a for-loop that operates on a list of articles. 
+
+To find the intersection of two categories (articles that exist in both), download the category lists using the -c option, then use grep to find the intersection:
 
 	grep -xF -f list1 list2
 
 Or to find the names unique to list2
 
 	grep -vxF -f list1 list2
-
-For other methods see [this page](http://mywiki.wooledge.org/BashFAQ/036)
 
 Credits
 ==================
