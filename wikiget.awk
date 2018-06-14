@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.00 \
+                 version   = 1.01 \
                  copyright = 2016-2018 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -1254,48 +1254,6 @@ function sys2varPipe(data, command,   fish, scale, ship) {
     return ship
 }
 
-
-#    
-# urlElement - given a URL, return a sub-portion (scheme, netloc, path, query, fragment)
-#
-#  In the URL "https://www.cwi.nl:80/nl?dooda/guido&path.htm#section"
-#   scheme = https
-#   netloc = www.cwi.nl:80
-#   path = /nl                  
-#   query = dooda/guido&path.htm
-#   fragment = section
-#
-#  Example:                
-#     uriElement("https://www.cwi.nl:80/nl?", "path") returns "/nl"
-#           
-#   . URLs have many edge cases. This function works for well-formed URLs.
-#   . If a robust solution is needed:
-#       "python3 -c \"from urllib.parse import urlsplit; import sys; o = urlsplit(sys.argv[1]); print(o." element ")\" " shquote(url)
-#   . returns full url on error
-#
-function urlElement(url,element,   a) {
-
-    match(url, /^([^:]+):\/\/([^/]+)\/([^?]+)\?([^#]+)#(.*)/, a)
-    switch (element) {
-        case "scheme":
-            return a[1]
-            break
-        case "netloc":
-            return a[2]
-            break
-        case "path":
-            return a[3]
-            break
-        case "query":
-            return a[4]
-            break
-        case "fragment":
-            return a[5]
-            break
-    }
-    return url
-}
-
 # 
 # urlencodeawk - urlencode a string
 #
@@ -1329,6 +1287,66 @@ function urlencodeawk(str,class,  c, len, res, i, ord, re) {
             res = res "%" sprintf("%02X", ord[c])
     }
     return res
+}
+
+#
+# urlElement - given a URL, return a sub-portion (scheme, netloc, path, query, fragment)
+#
+#  In the URL "https://www.cwi.nl:80/nl?dooda/guido&path.htm#section"
+#   scheme = https 
+#   netloc = www.cwi.nl:80          
+#   path = /nl
+#   query = dooda/guido&path.htm
+#   fragment = section 
+#
+#  Example:      
+#     uriElement("https://www.cwi.nl:80/nl?", "path") returns "/nl"
+#              
+#   . URLs have many edge cases. This function works for well-formed URLs.
+#   . If a robust solution is needed:
+#       "python3 -c \"from urllib.parse import urlsplit; import sys; o = urlsplit(sys.argv[1]); print(o." element ")\" " shquote(url)
+#   . returns full url on error
+#
+function urlElement(url,element,   a,scheme,netloc,tail,b,fragment,query,path) {
+
+  if(url ~ /^\/\//)        # Protocol-relative - assume http
+    url = "http:" url
+
+  split(url, a, /\//)
+
+  scheme = substr(a[1], 0, index(a[1], ":") -1)
+  netloc = a[3]
+
+  tail = subs(scheme "://" netloc, "", url)
+
+  splits(tail, b, "#")
+  if(!empty(b[2]))
+    fragment = b[2]
+
+  splits(tail, b, "?")
+  if(!empty(b[2])) {
+    query = b[2]
+    if(!empty(fragment))
+      query = subs("#" fragment, "", query)
+  }
+
+  path = tail
+  if(!empty(fragment))
+    path = subs("#" fragment, "", path)
+  if(!empty(query))
+    path = subs("?" query, "", path)
+
+  if(element == "scheme")
+    return scheme
+  else if(element == "netloc")
+    return netloc
+  else if(element == "path")
+    return path
+  else if(element == "query")
+    return query
+  else if(element == "fragment")
+    return fragment
+
 }
 
 #
@@ -1503,6 +1521,59 @@ function join2(arr, sep, sortkey,         i,lobster) {
         PROCINFO["sorted_in"] = ""
 
     return result
+}
+
+# 
+# subs() - like sub() but literal non-regex
+# 
+#   Example:
+#      s = "*field"
+#      print subs("*", "-", s)  #=> -field
+# 
+#   Credit: adapted from lsub() by Daniel Mills https://github.com/e36freak/awk-libs
+#
+function subs(pat, rep, str,    len, i) {
+
+    if (!length(str))
+        return
+
+    # get the length of pat, in order to know how much of the string to remove
+    if (!(len = length(pat)))
+        return str
+
+    # substitute str for rep
+    if (i = index(str, pat))
+        str = substr(str, 1, i - 1) rep substr(str, i + len)
+
+    return str
+}
+
+#
+# splits() - literal version of split()
+#
+#   . the "sep" is a literal string not re
+#   . see also subs() and gsubs()
+#    
+#   Credit: https://github.com/e36freak/awk-libs (Daniel Mills)
+#
+function splits(str, arr, sep,    len, slen, i) {
+
+    delete arr
+
+  # if "sep" is empty, just do a normal split
+    if (!(slen = length(sep))) {
+        return split(str, arr, "")
+    }
+
+  # loop while "sep" is matched
+    while (i = index(str, sep)) {
+        # append field to array
+        arr[++len] = substr(str, 1, i - 1)
+        # remove that portion (with the sep) from the string
+        str = substr(str, i + slen)
+    }
+    arr[++len] = str
+    return len
 }
 
 #

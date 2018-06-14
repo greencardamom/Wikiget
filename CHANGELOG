@@ -1,5 +1,6 @@
 # Changes in reverse chronological order
 #
+# 1.01 Jun 14      - new version of urlElement() + new subs() and splits()
 # 1.0  Jun 12      - add edit functions -E, -R and -I
 #                    add OAuth 
 #                    add new functions (randomnumber,splitx,etc)
