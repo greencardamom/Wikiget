@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.01 \
+                 version   = 1.02 \
                  copyright = 2016-2018 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -1254,41 +1254,6 @@ function sys2varPipe(data, command,   fish, scale, ship) {
     return ship
 }
 
-# 
-# urlencodeawk - urlencode a string
-#
-#  . if optional 'class' is "url" treat 'str' with best-practice URL encoding
-#     see https://perishablepress.com/stop-using-unsafe-characters-in-urls/
-#  . if 'class' is "rawphp" attempt to match behavior of PhP rawurlencode()              
-#  . otherwise encode everything except 0-9A-Za-z
-#          
-#  Requirement: gawk -b
-#  Credit: Rosetta Code May 2015
-#          GreenC
-#
-function urlencodeawk(str,class,  c, len, res, i, ord, re) {
-
-    if (class == "url")               
-        re = "[$\\-_.+!*'(),,;/?:@=&0-9A-Za-z]"
-    else if (class == "rawphp")         
-        re = "[\\-_.0-9A-Za-z]"
-    else
-        re = "[0-9A-Za-z]"
-
-    for (i = 0; i <= 255; i++)
-        ord[sprintf("%c", i)] = i        
-    len = length(str)      
-    res = ""
-    for (i = 1; i <= len; i++) {
-        c = substr(str, i, 1)
-        if (c ~ re)                # don't encode          
-            res = res c
-        else
-            res = res "%" sprintf("%02X", ord[c])
-    }
-    return res
-}
-
 #
 # urlElement - given a URL, return a sub-portion (scheme, netloc, path, query, fragment)
 #
@@ -1346,6 +1311,42 @@ function urlElement(url,element,   a,scheme,netloc,tail,b,fragment,query,path) {
     return query
   else if(element == "fragment")
     return fragment
+
+}
+
+# 
+# urlencodeawk - urlencode a string
+# 
+#  . if optional 'class' is "url" treat 'str' with best-practice URL encoding  
+#     see https://perishablepress.com/stop-using-unsafe-characters-in-urls/   
+#  . if 'class' is "rawphp" attempt to match behavior of PhP rawurlencode()
+#  . otherwise encode everything except 0-9A-Za-z
+# 
+#  Requirement: gawk -b
+#  Credit: Rosetta Code May 2015
+#          GreenC
+#
+function urlencodeawk(str,class,  c, len, res, i, ord, re) {                
+
+    if (class == "url")
+        re = "[$\\-_.+!*'(),,;/?:@=&0-9A-Za-z]"
+    else if (class == "rawphp")
+        re = "[\\-_.~0-9A-Za-z]"
+    else       
+        re = "[0-9A-Za-z]"
+
+    for (i = 0; i <= 255; i++)
+        ord[sprintf("%c", i)] = i
+    len = length(str)
+    res = ""
+    for (i = 1; i <= len; i++) {
+        c = substr(str, i, 1) 
+        if (c ~ re)                # don't encode
+            res = res c           
+        else
+            res = res "%" sprintf("%02X", ord[c])
+    }
+    return res
 
 }
 
@@ -2218,8 +2219,8 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
         print sp 
     }
     if (! G["debug"]) {
-        removefile(postfile)
-        removefile(outfile)
+        removefile2(postfile)
+        removefile2(outfile)
     }
 
     printResult(sp)
@@ -2293,10 +2294,17 @@ function printResult(json,  jsona,nc,sc) {
     if (jsona["edit","result"] ~ /[Ss]uccess/)
         sc++
 
-    if (sc && nc)                      
-        print "No change"     
-    else
+    if (sc && nc)
+        print "No change"
+    else {
+      if(! empty(jsona["error","info"]))
+        print jsona["error","info"]
+      else if(! empty(jsona["edit","result"]))
         print jsona["edit","result"]
+      else
+        print "Unknown"
+    }
+
 }
 
 #
