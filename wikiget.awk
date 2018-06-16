@@ -2294,15 +2294,17 @@ function printResult(json,  jsona,nc,sc) {
     if (jsona["edit","result"] ~ /[Ss]uccess/)
         sc++
 
-    if (sc && nc)
+    if (sc && nc)                 
         print "No change"
+    else if(sc)
+        print jsona["edit","result"]
     else {
       if(! empty(jsona["error","info"]))
         print jsona["error","info"]
-      else if(! empty(jsona["edit","result"]))
-        print jsona["edit","result"]
+      else if(! empty(jsona["edit","spamblacklist"]))
+        print jsona["edit","spamblacklist"]
       else
-        print "Unknown"
+        print "Unknown error" 
     }
 
 }

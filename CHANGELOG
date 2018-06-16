@@ -1,6 +1,7 @@
 # Changes in reverse chronological order
 #
-# 1.02 Jun 15      - fix removefile(). fix urlencodeawk(). fix printResult()
+# 1.03 Jun 16      - add spamblacklist error to printResult()
+# 1.02 Jun 15      - fix removefile(), urlencodeawk(), printResult()
 # 1.01 Jun 14      - new version of urlElement() + new subs() and splits()
 # 1.0  Jun 12      - add edit functions -E, -R and -I
 #                    add OAuth 
