@@ -1,5 +1,6 @@
 # Changes in reverse chronological order
 #
+# 1.04 Jul 15      - fix -P STDIN (strip newlines)
 # 1.03 Jun 16      - add spamblacklist error to printResult()
 # 1.02 Jun 15      - fix removefile(), urlencodeawk(), printResult()
 # 1.01 Jun 14      - new version of urlElement() + new subs() and splits()

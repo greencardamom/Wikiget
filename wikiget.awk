@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.02 \
+                 version   = 1.04 \
                  copyright = 2016-2018 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -2187,10 +2187,8 @@ function setupEdit(   cookiejar) {
 function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,outfile,text) {
 
     if (page == "STDIN") {
-        while ( (getline line < "/dev/stdin") > 0) {
-            if (!empty(line))
-                fp = fp line "\n"
-        }
+        while ( (getline line < "/dev/stdin") > 0) 
+            fp = fp line "\n"
         outfile = mktemp("wikigetstdinfile.XXXXXX", "f")
         print fp > outfile
         close(outfile)
