@@ -195,7 +195,7 @@ A search-replace bot:
 
 	wikiget -w "Wikipedia" | sed 's/Wikipedia/Wikipodium/g' | wikiget -E "Wikipedia" -S "Change to Wikipodium" -P STDIN
 
-Expand: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E). This can be added to a for-loop that operates on a list of articles. 
+Expand: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E) with (-S) edit summary taking input from STDIN. This can be added to a for-loop that operates on a list of articles. This pipe method is for light and quick work, for a production bot a script should check wikiget output for an error ie. a result other than "Success" or "No change" then make a retry. In about 5% of uploads the WMF servers fail and a retry is needed, up to 3 is usually enough.
 
 To find the intersection of two categories (articles that exist in both), download the category lists using the -c option, then use grep to find the intersection:
 
