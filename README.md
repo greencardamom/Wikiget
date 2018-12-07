@@ -55,7 +55,10 @@ Wikiget options and examples:
 	         -j             (option) Show number of search results
 	
 	 External links list:
-	       -x <URL>         List articles containing external link (Special:Linksearch)
+	       -x <domain name> List articles containing domain name (Special:Linksearch)
+	                        Works with domain-name only. To search for a full URI use
+	                          regex. eg. -a "insource:/http:\/\/gq.com\/home.htm/"
+	                        To include subdomains use wildcards: "-x *.domain.com"
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
@@ -73,6 +76,13 @@ Wikiget options and examples:
 	       -w <article>     Print wiki text of article
 	         -p             (option) Plain-text version (strip wiki markup)
 	         -f             (option) Don't follow redirects (print redirect page)
+	
+	 All pages:
+	       -A               Print list of all page titles (possibly very large list)
+	         -t <# type>    1=All, 2=Skip redirects, 3=Only redirects. Default: 2
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
 	
 	 Edit page (experimental):
 	       -E <title>       Edit a page with this title. Requires -S and -P
@@ -150,13 +160,19 @@ Wikiget options and examples:
 	   search docs: https://www.mediawiki.org/wiki/Help:CirrusSearch
 	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
 	
-	 External link list:
+	 External links:
 	   list articles containing a URL with this domain
 	     wikiget -x "news.yahoo.com"
+	   list articles in NS 1 containing a URL with this domain
+	     wikiget -x "*.yahoo.com" -n 1
 	
 	 Recent changes:
 	   recent changes in last 30 days tagged with this ID
 	     wikiget -r -k "OAuth CID: 678"
+	
+	 All pages:
+	   all page titles excluding redirects w/debug tracking progress
+	     wikiget -A -t 2 -y > list.txt
 	
 	 Print wiki text:
 	   wiki text of article "Paris" on the English Wiki
@@ -195,7 +211,9 @@ A search-replace bot:
 
 	wikiget -w "Wikipedia" | sed 's/Wikipedia/Wikipodium/g' | wikiget -E "Wikipedia" -S "Change to Wikipodium" -P STDIN
 
-Expand: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E) with (-S) edit summary taking input from STDIN. This can be added to a for-loop that operates on a list of articles. This pipe method is for light and quick work, for a production bot a script should check wikiget output for an error ie. a result other than "Success" or "No change" then make a retry. In about 5% of uploads the WMF servers fail and a retry is needed, up to 3 is usually enough.
+Expand: download the wikisource (-w) for article "Wikipedia". Search/replace (sed) all occurances of 'Wikipedia' with 'Wikipodium'. Upload result (-E) with (-S) edit summary taking input from STDIN. This can be added to a for-loop that operates on a list of articles. 
+
+This unix pipe method is for light and quick work, for a production bot a script would invoke wikiget with -P <filename> and check its output for an error ie. a result other than "Success" or "No change" then make a retry. In about 5% of uploads the WMF servers fail and a retry is needed, up to 3 are usually enough. Retries are not built-in to Wikiget as it depends on the calling application how to handle error results.
 
 To find the intersection of two categories (articles that exist in both), download the category lists using the -c option, then use grep to find the intersection:
 

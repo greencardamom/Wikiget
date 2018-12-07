@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.04 \
+                 version   = 1.10 \
                  copyright = 2016-2018 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -77,7 +77,7 @@ BEGIN {
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:A")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -135,6 +135,12 @@ function parsecommandline(c,opts,Arguments) {
         if (c == "k")                                 #  -k <tag>        Tag for recent changes
             Arguments["tags"] = verifyval(Optarg)
         
+
+        if (c == "A") {                               #  -A              Dump a list of all article titles on Wikipedia (no redirects)
+            Arguments["main_c"] = "A"
+        }
+        if (c == "t")                                 #  -t <type>       Filter redirects
+            Arguments["redirtype"] = verifyval(Optarg)
    
         if (c == "w") {                               #  -w <article>    Print wiki text 
             Arguments["main"] = verifyval(Optarg)
@@ -231,6 +237,11 @@ function processarguments(Arguments,   c,a,i) {
     else
         G["snippet"] = "false"
 
+    if (Arguments["redirtype"] !~ /1|2|3/)
+        G["redirtype"] = "2"
+    else
+        G["redirtype"] = Arguments["redirtype"]
+
     if (Arguments["numsearch"] == "true")
         G["numsearch"] = "true"
     else
@@ -241,7 +252,7 @@ function processarguments(Arguments,   c,a,i) {
     else
         G["searchtarget"] = Arguments["searchtarget"]
 
-    if (length(Arguments["bltypes"]) > 0) {
+    if (length(Arguments["bltypes"]) > 0 && Arguments["main_c"] == "b") {
         if (Arguments["bltypes"] !~ /[^ntf]/) {    # ie. contains only those letters
             c = split(Arguments["bltypes"], a, "")
             while (i++ < c) 
@@ -290,6 +301,9 @@ function processarguments(Arguments,   c,a,i) {
         if (empty(Arguments["moveto"]))
             usage(1)
         movePage(Arguments["movefrom"], Arguments["moveto"])
+    }
+    else if (Arguments["main_c"] == "A") {
+        allPages(G["redirtype"])
     }
     else if (Arguments["main_c"] == "b") {                     # backlinks
         if ( entity_exists(Arguments["main"]) ) {
@@ -394,9 +408,10 @@ function usage(die) {
     print "         -j             (option) Show number of search results"
     print ""
     print " External links list:"
-    print "       -x <URL>         List articles containing external link (Special:Linksearch)"
+    print "       -x <domain name> List articles containing domain name (Special:Linksearch)"
     print "                        Works with domain-name only. To search for a full URI use" 
-    print "                        -a w/ regex. eg. -a \"insource:/http:\\/\\/gq.com\\/home.htm/\""  
+    print "                          regex. eg. -a \"insource:/http:\\/\\/gq.com\\/home.htm/\""  
+    print "                        To include subdomains use wildcards: \"-x *.domain.com\""
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -414,6 +429,13 @@ function usage(die) {
     print "       -w <article>     Print wiki text of article"
     print "         -p             (option) Plain-text version (strip wiki markup)"
     print "         -f             (option) Don't follow redirects (print redirect page)"
+    print ""
+    print " All pages:"
+    print "       -A               Print list of all page titles (possibly very large list)" 
+    print "         -t <# type>    1=All, 2=Skip redirects, 3=Only redirects. Default: 2"
+    print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+    print "                         Only list pages in this namespace. Default: 0"
+    print "                         See -h for NS codes and examples"
     print ""
     print " Edit page (experimental):"
     print "       -E <title>       Edit a page with this title. Requires -S and -P"
@@ -496,10 +518,16 @@ function usage_extended() {
     print " External link list:"
     print "   list articles containing a URL with this domain"
     print "     wikiget -x \"news.yahoo.com\""
+    print "   list articles in NS 1 containing a URL with this domain"
+    print "     wikiget -x \"*.yahoo.com\" -n 1"
     print ""
     print " Recent changes:"
     print "   recent changes in last 30 days tagged with this ID"
     print "     wikiget -r -k \"OAuth CID: 678\""
+    print ""
+    print " All pages:"
+    print "   all page titles excluding redirects w/debug tracking progress"
+    print "     wikiget -A -t 2 -y > list.txt"
     print ""
     print " Print wiki text:"
     print "   wiki text of article \"Paris\" on the English Wiki"
@@ -685,7 +713,7 @@ function category(entity,   ct, url, results) {
         ct = strip(ct)
         gsub(/[ ]/,"|",ct)
  
-        url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=500&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq(getcategory(url, entity) )
 
@@ -701,7 +729,7 @@ function getcategory(url, entity,   jsonin, jsonout, continuecode) {
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin, "cmcontinue")
         while ( continuecode ) {
-            url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
+            url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin, "cmcontinue")
@@ -715,7 +743,7 @@ function getcategory(url, entity,   jsonin, jsonout, continuecode) {
 # MediaWiki API:Exturlusage
 #  https://www.mediawiki.org/wiki/API:Exturlusage
 #
-function xlinks(entity,   ct, url, results) {
+function xlinks(entity,   url,results,a,c,i) {
 
         if (entity ~ /^https?/ )
             gsub(/^https?[:]\/\//,"",entity)
@@ -725,27 +753,35 @@ function xlinks(entity,   ct, url, results) {
         if (entity ~ /^[*]$/) {
             entity = ""
         }
+        
+        c = split("http|https|ftp|ftps|sftp", a, /[|]/)
+        # iterate for euprotocol=a[i]
+        for(i = 1; i <= c; i++) {
+          url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(a[i]) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+          results = results "\n" getxlinks(url, entity, "http") 
+        }
 
-        url = G["apiURL"] "action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eunamespace=" urlencodeawk(G["namespace"]) "&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
- 
-        results = uniq( getxlinks(url, entity) )
+        results = uniq( results )
 
         if ( length(results) > 0)
             print results
         return length(results)
+
 }
-function getxlinks(url, entity,   jsonin, jsonout, offset) {
+function getxlinks(url, entity, euprotocol,     jsonin, jsonout, continuecode) {
 
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
         jsonout = json2var(jsonin)
-        offset = getoffsetjson(jsonin, "euoffset")
-        while ( offset ) {
-            url = G["apiURL"] "action=query&list=exturlusage&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&format=json&utf8=1&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&euoffset=" offset 
+        continuecode = getcontinue(jsonin,"eucontinue")
+
+        while ( continuecode ) {
+            url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
-            offset = getoffsetjson(jsonin, "euoffset")
+            continuecode = getcontinue(jsonin,"eucontinue")
+
         }
         return jsonout
 }
@@ -765,7 +801,7 @@ function rechanges(username, tag,      url, results, entity) {
         else 
             return 0
 
-        url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq( getrechanges(url, entity) )
 
@@ -782,7 +818,7 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode ) {
-            url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"rccontinue")
@@ -802,7 +838,7 @@ function ucontribs(entity,sdate,edate,      url, results) {
         # API stopped working with User: prefix sometime in April 2018
         sub(/^[Uu]ser[:]/, "", entity)
 
-        url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq( getucontribs(url, entity, sdate, edate) )
 
@@ -819,7 +855,7 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         continuecode = getcontinue(jsonin,"uccontinue")
 
         while ( continuecode ) {
-            url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"uccontinue")
@@ -836,7 +872,7 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
 #
 function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
 
-        url = G["apiURL"] "action=parse&prop=" urlencodeawk("links") "&page=" urlencodeawk(entity) "&format=json&utf8=1&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=parse&prop=" urlencodeawk("links") "&page=" urlencodeawk(entity) "&format=json&formatversion=2&maxlag=" G["maxlag"]
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
@@ -855,19 +891,19 @@ function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
 function backlinks(entity,      url, blinks) {
 
         if (G["bltypes"] ~ /n/) {
-            url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             blinks = getbacklinks(url, entity, "blcontinue") # normal backlinks
         }
 
         if ( entity ~ /^[Tt]emplate[:]/ && G["bltypes"] ~ /t/) {    # transclusion backlinks
-            url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&formatversion=2&maxlag=" G["maxlag"]
             if (length(blinks) > 0)
                 blinks = blinks "\n" getbacklinks(url, entity, "eicontinue")
             else
                 blinks = getbacklinks(url, entity, "eicontinue")
         } 
         else if ( entity ~ /^[Ff]ile[:]/ && G["bltypes"] ~ /f/) { # file backlinks
-            url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             if (length(blinks) > 0)
                 blinks = blinks "\n" getbacklinks(url, entity, "iucontinue")
             else
@@ -892,11 +928,11 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
         while ( continuecode ) {
 
             if ( method == "eicontinue" )
-                url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             if ( method == "iucontinue" )
-                url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             if ( method == "blcontinue" )
-                url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&utf8=1&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -963,6 +999,49 @@ function wikitext(namewiki,   command,f,r,redirurl) {
         else
             return f
 }
+
+# ___ All pages (-A)
+
+#
+# MediaWiki API: Allpages
+#  https://www.mediawiki.org/wiki/API:Allpages
+#
+function allPages(redirtype,    url,results,apfilterredir) {
+
+        if(redirtype == "1")
+          apfilterredir = "&apfilterredir=all"
+        else if(redirtype == "2")
+          apfilterredir = "&apfilterredir=nonredirects"
+        else if(redirtype == "3")
+          apfilterredir = "&apfilterredir=redirects"
+        else
+          apfilterredir = "&apfilterredir=nonredirects"
+
+        url = G["apiURL"] "action=query&list=allpages&aplimit=500" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+
+        results = uniq( getallpages(url, apfilterredir) )
+
+        if ( length(results) > 0) 
+            print results
+        return length(results)
+}
+function getallpages(url,apfilterredir,         jsonin, jsonout, continuecode) {
+
+        jsonin = http2var(url)
+        if (apierror(jsonin, "json") > 0)
+            return ""
+        jsonout = json2var(jsonin)
+        continuecode = getcontinue(jsonin,"apcontinue")
+
+        while ( continuecode ) {
+            url = G["apiURL"] "action=query&list=allpages&aplimit=500" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            jsonin = http2var(url)
+            jsonout = jsonout "\n" json2var(jsonin)
+            continuecode = getcontinue(jsonin,"apcontinue")
+        }
+        return jsonout
+}
+
 
 # ___ Search list (-a) 
 
@@ -1093,32 +1172,13 @@ function json2var(json,  jsona,arr) {
 #
 # Parse continue code from JSON input
 #
-function getcontinue(jsonin, method     ,re,a,b,c) {
+function getcontinue(jsonin, method,    jsona,id) {
 
-        # "continue":{"blcontinue":"0|20304297","continue"
-
-        re = "\"continue\"[:][{]\"" method "\"[:]\"[^\"]*\""
-        match(jsonin, re, a)
-        split(a[0], b, "\"")
-
-        if ( length(b[6]) > 0)
-            return b[6]
-        return 0
-}
-
-#
-# Parse offset code from JSON input
-#
-function getoffsetjson(jsonin, method     ,re,a,b,c) {
-
-        # "continue":{"euoffset": 10,"continue"
-
-        re = "\"continue\"[:][{]\"" method "\"[:][^,]*[^,]"
-        match(jsonin, re, a)
-        split(a[0], b, /[:]/)
-
-        if ( length(b[3]) > 0)
-            return strip(b[3])
+        if( query_json(jsonin, jsona) >= 0) {
+          id = jsona["continue", method]
+          if(!empty(id))
+            return id
+        }
         return 0
 }
 
@@ -1254,19 +1314,20 @@ function sys2varPipe(data, command,   fish, scale, ship) {
     return ship
 }
 
-#
+
+#    
 # urlElement - given a URL, return a sub-portion (scheme, netloc, path, query, fragment)
 #
 #  In the URL "https://www.cwi.nl:80/nl?dooda/guido&path.htm#section"
-#   scheme = https 
-#   netloc = www.cwi.nl:80          
-#   path = /nl
+#   scheme = https
+#   netloc = www.cwi.nl:80
+#   path = /nl                  
 #   query = dooda/guido&path.htm
-#   fragment = section 
+#   fragment = section
 #
-#  Example:      
+#  Example:                
 #     uriElement("https://www.cwi.nl:80/nl?", "path") returns "/nl"
-#              
+#           
 #   . URLs have many edge cases. This function works for well-formed URLs.
 #   . If a robust solution is needed:
 #       "python3 -c \"from urllib.parse import urlsplit; import sys; o = urlsplit(sys.argv[1]); print(o." element ")\" " shquote(url)
@@ -1300,7 +1361,7 @@ function urlElement(url,element,   a,scheme,netloc,tail,b,fragment,query,path) {
     path = subs("#" fragment, "", path)
   if(!empty(query))
     path = subs("?" query, "", path)
-
+    
   if(element == "scheme")
     return scheme
   else if(element == "netloc")
@@ -1316,38 +1377,37 @@ function urlElement(url,element,   a,scheme,netloc,tail,b,fragment,query,path) {
 
 # 
 # urlencodeawk - urlencode a string
-# 
-#  . if optional 'class' is "url" treat 'str' with best-practice URL encoding  
-#     see https://perishablepress.com/stop-using-unsafe-characters-in-urls/   
-#  . if 'class' is "rawphp" attempt to match behavior of PhP rawurlencode()
+#
+#  . if optional 'class' is "url" treat 'str' with best-practice URL encoding
+#     see https://perishablepress.com/stop-using-unsafe-characters-in-urls/
+#  . if 'class' is "rawphp" attempt to match behavior of PhP rawurlencode()              
 #  . otherwise encode everything except 0-9A-Za-z
-# 
+#          
 #  Requirement: gawk -b
 #  Credit: Rosetta Code May 2015
 #          GreenC
 #
-function urlencodeawk(str,class,  c, len, res, i, ord, re) {                
+function urlencodeawk(str,class,  c, len, res, i, ord, re) {
 
-    if (class == "url")
+    if (class == "url")               
         re = "[$\\-_.+!*'(),,;/?:@=&0-9A-Za-z]"
-    else if (class == "rawphp")
+    else if (class == "rawphp")         
         re = "[\\-_.~0-9A-Za-z]"
-    else       
+    else
         re = "[0-9A-Za-z]"
 
     for (i = 0; i <= 255; i++)
-        ord[sprintf("%c", i)] = i
-    len = length(str)
+        ord[sprintf("%c", i)] = i        
+    len = length(str)      
     res = ""
     for (i = 1; i <= len; i++) {
-        c = substr(str, i, 1) 
-        if (c ~ re)                # don't encode
-            res = res c           
+        c = substr(str, i, 1)
+        if (c ~ re)                # don't encode          
+            res = res c
         else
             res = res "%" sprintf("%02X", ord[c])
     }
     return res
-
 }
 
 #
@@ -1532,7 +1592,7 @@ function join2(arr, sep, sortkey,         i,lobster) {
 #      print subs("*", "-", s)  #=> -field
 # 
 #   Credit: adapted from lsub() by Daniel Mills https://github.com/e36freak/awk-libs
-#
+# 
 function subs(pat, rep, str,    len, i) {
 
     if (!length(str))
@@ -1546,23 +1606,23 @@ function subs(pat, rep, str,    len, i) {
     if (i = index(str, pat))
         str = substr(str, 1, i - 1) rep substr(str, i + len)
 
-    return str
-}
+    return str     
+}                  
 
 #
 # splits() - literal version of split()
 #
 #   . the "sep" is a literal string not re
 #   . see also subs() and gsubs()
-#    
+#       
 #   Credit: https://github.com/e36freak/awk-libs (Daniel Mills)
-#
+#              
 function splits(str, arr, sep,    len, slen, i) {
 
     delete arr
 
   # if "sep" is empty, just do a normal split
-    if (!(slen = length(sep))) {
+    if (!(slen = length(sep))) {         
         return split(str, arr, "")
     }
 
@@ -1576,6 +1636,7 @@ function splits(str, arr, sep,    len, slen, i) {
     arr[++len] = str
     return len
 }
+
 
 #
 # asplit() - given a string of "key=value SEP key=value" pairs, break it into array[key]=value
@@ -2292,19 +2353,18 @@ function printResult(json,  jsona,nc,sc) {
     if (jsona["edit","result"] ~ /[Ss]uccess/)
         sc++
 
-    if (sc && nc)                 
-        print "No change"
+    if (sc && nc)                      
+        print "No change"     
     else if(sc)
         print jsona["edit","result"]
     else {
-      if(! empty(jsona["error","info"]))
+      if(! empty(jsona["error","info"])) 
         print jsona["error","info"]
       else if(! empty(jsona["edit","spamblacklist"]))
         print jsona["edit","spamblacklist"]
       else
-        print "Unknown error" 
+        print "Unknown error"
     }
-
 }
 
 #
