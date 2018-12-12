@@ -1,5 +1,6 @@
 # Changes in reverse chronological order
 #
+# 1.11 Dec 11      - add -k for -A
 # 1.10 Dec 07      - fix bug in getcontinue() to use query_json()
 #                    add -A (get all page titles)
 #                    change &utf8=1 to &formatversion=2 in all API calls

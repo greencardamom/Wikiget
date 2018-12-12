@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.10 \
+                 version   = 1.11 \
                  copyright = 2016-2018 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -141,6 +141,8 @@ function parsecommandline(c,opts,Arguments) {
         }
         if (c == "t")                                 #  -t <type>       Filter redirects
             Arguments["redirtype"] = verifyval(Optarg)
+        if (c == "k")                                 #  -k <#>          Number of pages to return
+            Arguments["maxpages"] = verifyval(Optarg)
    
         if (c == "w") {                               #  -w <article>    Print wiki text 
             Arguments["main"] = verifyval(Optarg)
@@ -211,6 +213,11 @@ function processarguments(Arguments,   c,a,i) {
     if (isanumber(Arguments["maxlag"])) 
         G["maxlag"] = Arguments["maxlag"]
         # default set in BEGIN{}
+
+    if (isanumber(Arguments["maxpages"])) 
+        G["maxpages"] = Arguments["maxpages"]
+    else
+        G["maxpages"] = 10
 
     if (isanumber(Arguments["maxsearch"])) 
         G["maxsearch"] = Arguments["maxsearch"]
@@ -431,8 +438,9 @@ function usage(die) {
     print "         -f             (option) Don't follow redirects (print redirect page)"
     print ""
     print " All pages:"
-    print "       -A               Print list of all page titles (possibly very large list)" 
+    print "       -A               Print a list of page titles on the wiki (possibly very large)" 
     print "         -t <# type>    1=All, 2=Skip redirects, 3=Only redirects. Default: 2"
+    print "         -k <#>         Number of pages to return. 0 is all. Default: 10"
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -528,6 +536,8 @@ function usage_extended() {
     print " All pages:"
     print "   all page titles excluding redirects w/debug tracking progress"
     print "     wikiget -A -t 2 -y > list.txt"
+    print "   first 50 page titles including redirects"
+    print "     wikiget -A -t 1 -k 50 > list.txt"
     print ""
     print " Print wiki text:"
     print "   wiki text of article \"Paris\" on the English Wiki"
@@ -1006,40 +1016,84 @@ function wikitext(namewiki,   command,f,r,redirurl) {
 # MediaWiki API: Allpages
 #  https://www.mediawiki.org/wiki/API:Allpages
 #
-function allPages(redirtype,    url,results,apfilterredir) {
+function allPages(redirtype,    url,results,apfilterredir,aplimit) {
 
-        if(redirtype == "1")
-          apfilterredir = "&apfilterredir=all"
-        else if(redirtype == "2")
-          apfilterredir = "&apfilterredir=nonredirects"
-        else if(redirtype == "3")
-          apfilterredir = "&apfilterredir=redirects"
+        if (redirtype == "1")
+            apfilterredir = "all"
+        else if (redirtype == "2")
+            apfilterredir = "nonredirects"
+        else if (redirtype == "3")
+            apfilterredir = "redirects"
         else
-          apfilterredir = "&apfilterredir=nonredirects"
+            apfilterredir = "nonredirects"
 
-        url = G["apiURL"] "action=query&list=allpages&aplimit=500" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+        if (G["maxpages"] < 500)
+            aplimit = G["maxpages"] + G["maxpages"]  # get extra in case redirs are filtered 
+        else
+            aplimit = 500
 
-        results = uniq( getallpages(url, apfilterredir) )
+        url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+
+        results = uniq( getallpages(url, apfilterredir, aplimit) )
 
         if ( length(results) > 0) 
             print results
         return length(results)
 }
-function getallpages(url,apfilterredir,         jsonin, jsonout, continuecode) {
+function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continuecode, count) {
 
         jsonin = http2var(url)
-        if (apierror(jsonin, "json") > 0)
+        if ( apierror(jsonin, "json") > 0)
             return ""
-        jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin,"apcontinue")
 
+        if ( ! empty(json2var(jsonin))) {
+
+            jsonout = json2var(jsonin)
+
+            if (G["maxpages"] > 0) {                     # if -k is anything but 0, break out if maxpages is reached
+              count = count + split(json2var(jsonin), a, "\n")
+              if ( count > G["maxpages"])  
+                  return trimjsonout(jsonout)
+              else if ( count == G["maxpages"])
+                  return jsonout
+            }
+        }
+
         while ( continuecode ) {
-            url = G["apiURL"] "action=query&list=allpages&aplimit=500" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
-            jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"apcontinue")
+            if ( ! empty(json2var(jsonin))) { 
+
+                if ( ! empty(jsonout)) 
+                    jsonout = jsonout "\n" json2var(jsonin)
+                else 
+                    jsonout = json2var(jsonin)
+
+                if (G["maxpages"] > 0) {
+                  count = count + split(json2var(jsonin), a, "\n")
+                  if ( count > G["maxpages"])  
+                      return trimjsonout(jsonout)
+                  else if ( count == G["maxpages"])
+                      return jsonout
+                }
+            }
         }
         return jsonout
+}
+function trimjsonout(jsonout,  newout,c,i,a) {
+
+        c = split(jsonout, a, "\n")
+        for(i = 1; i <= G["maxpages"]; i++) {
+            if ( ! empty(a[i])) {
+                if ( i == 1)
+                    newout = a[i]
+                else if ( i > 1)
+                    newout = newout "\n" a[i]
+            }
+        }
+        return newout  
 }
 
 
@@ -2195,8 +2249,9 @@ function splitja(jsonarr, arr, indexn, value) {
     delete arr                 
     for (ja in jsonarr) {
         c = split(ja, a, SUBSEP)
-        if (a[c] == value) 
+        if (a[c] == value) {
             arr[a[indexn]] = jsonarr[ja]
+        }
     }
     return length(arr)
 }

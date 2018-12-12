@@ -78,8 +78,9 @@ Wikiget options and examples:
 	         -f             (option) Don't follow redirects (print redirect page)
 	
 	 All pages:
-	       -A               Print list of all page titles (possibly very large list)
+	       -A               Print a list of page titles on the wiki (possibly very large)
 	         -t <# type>    1=All, 2=Skip redirects, 3=Only redirects. Default: 2
+	         -k <#>         Number of pages to return. 0 is all. Default: 10
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
@@ -173,6 +174,8 @@ Wikiget options and examples:
 	 All pages:
 	   all page titles excluding redirects w/debug tracking progress
 	     wikiget -A -t 2 -y > list.txt
+	   first 50 page titles including redirects
+	     wikiget -A -t 1 -k 50 > list.txt
 	
 	 Print wiki text:
 	   wiki text of article "Paris" on the English Wiki
