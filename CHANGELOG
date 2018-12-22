@@ -1,5 +1,6 @@
 # Changes in reverse chronological order
 #
+# 1.12 Dec 21      - add -B
 # 1.11 Dec 11      - add -k for -A
 # 1.10 Dec 07      - fix bug in getcontinue() to use query_json()
 #                    add -A (get all page titles)

@@ -27,6 +27,12 @@ Wikiget options and examples:
 	                         See -h for NS codes and examples
 	 Forward-links:
 	       -F <name>        Forward-links for article, template, userpage, etc..
+
+	 Redirects:
+	       -B <name>        Redirects for article, template, userpage, etc..
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)
+	                         Only list redirects in this namespace. Default: 0
+	                         See -h for NS codes and examples
 	
 	 User contributions:
 	       -u <username>    Username without User: prefix
@@ -85,7 +91,7 @@ Wikiget options and examples:
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
 	
-	 Edit page (experimental):
+	 Edit page:
 	       -E <title>       Edit a page with this title. Requires -S and -P
 	         -S <summary>   Edit summary
 	         -P <filename>  Page content filename. If "STDIN" read from stdin

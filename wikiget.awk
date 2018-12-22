@@ -53,8 +53,8 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.11 \
-                 copyright = 2016-2018 \
+                 version   = 1.12 \
+                 copyright = 2016-2019 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
@@ -77,7 +77,7 @@ BEGIN {
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:A")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:AB:")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -95,6 +95,11 @@ function parsecommandline(c,opts,Arguments) {
         if (c == "F") {                               #  -F <entity>     Forward-links for entity ( -F "Example" )
             Arguments["main"] = verifyval(Optarg)
             Arguments["main_c"] = "F"
+        }
+
+        if (c == "B") {                               #  -B <entity>     Redirects for entity ( -B "Example" )
+            Arguments["main"] = verifyval(Optarg)
+            Arguments["main_c"] = "B"
         }
 
         if (c == "c") {                               #  -b <entity>     List articles in a category ( -c "Category:1900 births" )
@@ -321,6 +326,9 @@ function processarguments(Arguments,   c,a,i) {
     else if (Arguments["main_c"] == "F") {                     # forward-links
         forlinks(Arguments["main"])
     }
+    else if (Arguments["main_c"] == "B") {                     # redirects
+        redirects(Arguments["main"])
+    }
     else if (Arguments["main_c"] == "c") {                     # categories
         category(Arguments["main"])
     }
@@ -388,6 +396,12 @@ function usage(die) {
     print " Forward-links:"
     print "       -F <name>        Forward-links for article, template, userpage, etc.."
     print ""
+    print " Redirects:"
+    print "       -B <name>        Redirects for article, template, userpage, etc.."
+    print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)" 
+    print "                         Only list redirects in this namespace. Default: 0"
+    print "                         See -h for NS codes and examples"
+    print ""
     print " User contributions:"
     print "       -u <username>    Username without User: prefix"
     print "         -s <starttime> Start time in YMD format (-s 20150101). Required with -u"
@@ -445,7 +459,7 @@ function usage(die) {
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
     print ""
-    print " Edit page (experimental):"
+    print " Edit page:"
     print "       -E <title>       Edit a page with this title. Requires -S and -P"
     print "         -S <summary>   Edit summary"
     print "         -P <filename>  Page content filename. If \"STDIN\" read from stdin"
@@ -892,6 +906,41 @@ function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
         return length(jsonout)       
 }
 
+# ___ Redirects (-B) 
+# Note: Must set namespace - will only return for the given namespace
+
+#
+# MediaWiki API:Redirects
+#  https://www.mediawiki.org/wiki/API:Redirects
+#
+function redirects(entity,      url, results) {
+
+        url = G["apiURL"] "action=query&prop=redirects&titles=" urlencodeawk(entity) "&rdprop=title&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=500&maxlag=" G["maxlag"]
+
+        results = uniq( getrdchanges(url, entity) )
+
+        if ( length(results) > 0) 
+            print results
+        return length(results)
+}
+function getrdchanges(url, entity,         jsonin, jsonout, continuecode) {
+
+        jsonin = http2var(url)
+        if (apierror(jsonin, "json") > 0)
+            return ""
+        jsonout = json2varRd(jsonin)
+        continuecode = getcontinue(jsonin,"rdcontinue")
+
+        while ( continuecode ) {
+            url = G["apiURL"] "action=query&prop=redirects&rdprop=title&rdcontinue=" urlencodeawk(continuecode) "&titles=" urlencodeawk(entity) "&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=500&maxlag=" G["maxlag"]
+            jsonin = http2var(url)
+            jsonout = jsonout "\n" json2varRd(jsonin)
+            continuecode = getcontinue(jsonin,"rdcontinue")
+        }
+        return jsonout
+}
+
+
 # ___ Backlinks (-b) 
 
 #
@@ -1219,6 +1268,17 @@ function totalhits(xmlin) {
 function json2var(json,  jsona,arr) {
     if (query_json(json, jsona) >= 0) {
         splitja(jsona, arr, 3, "title")
+        return join(arr, 1, length(arr), "\n")
+    }
+}
+
+#
+# json2varRd - given raw json extract field "title" and convert to \n seperated string - for API:Redirects
+#
+function json2varRd(json,  jsona,arr) {
+    if (query_json(json, jsona) >= 0) {
+        # jsona["query","pages","1","redirects","4","title"]=Template:Cite-web
+        splitja(jsona, arr, 5, "title")
         return join(arr, 1, length(arr), "\n")
     }
 }
