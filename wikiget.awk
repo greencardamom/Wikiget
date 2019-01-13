@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.12 \
+                 version   = 1.13 \
                  copyright = 2016-2019 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -1076,7 +1076,7 @@ function allPages(redirtype,    url,results,apfilterredir,aplimit) {
         else
             apfilterredir = "nonredirects"
 
-        if (G["maxpages"] < 500)
+        if (G["maxpages"] < 500 && G["maxpages"] > 0)
             aplimit = G["maxpages"] + G["maxpages"]  # get extra in case redirs are filtered 
         else
             aplimit = 500
