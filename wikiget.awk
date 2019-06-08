@@ -310,9 +310,13 @@ function processarguments(Arguments,   c,a,i) {
         userInfo()
     }
     else if (Arguments["main_c"] == "R") {                     # move page
+        if (empty(Arguments["summary"])) {
+          stdErr("Missing -S (reason for move)")
+          usage(1)
+        }
         if (empty(Arguments["moveto"]))
             usage(1)
-        movePage(Arguments["movefrom"], Arguments["moveto"])
+        movePage(Arguments["movefrom"], Arguments["moveto"], Arguments["summary"])
     }
     else if (Arguments["main_c"] == "A") {
         allPages(G["redirtype"])
@@ -2421,10 +2425,10 @@ function getEditToken(  sp,jsona,command,data) {
 
 }
 
-function moveArticle(from,to,    sp,jsona,data,command) {
+function moveArticle(from,to,reason,    sp,jsona,data,command) {
 
     setupEdit()
-    data = strip("action=move&bot&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&movetalk&token=" urlencodeawk(getEditToken()) )
+    data = strip("action=move&bot&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&reason=" urlencodeawk(reason, "rawphp") "&movetalk=&token=" urlencodeawk(getEditToken()) )
     sp = sys2var(apiurl(data))
 
     if (G["debug"]) {
@@ -2477,6 +2481,8 @@ function printResult(json,  jsona,nc,sc) {
         print jsona["error","info"]
       else if(! empty(jsona["edit","spamblacklist"]))
         print jsona["edit","spamblacklist"]
+      else if( !empty(jsona["move","from"]) && !empty(jsona["move","to"]) )
+        print "Page moved from " shquote(jsona["move","from"]) " -> " shquote(jsona["move","to"])
       else
         print "Unknown error"
     }

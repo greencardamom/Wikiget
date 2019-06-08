@@ -1,5 +1,7 @@
 # Changes in reverse chronological order
 #
+# 1.14 Jun 08      - fix bug in -R (page move)
+# 1.13 Jan 13 2019 - fix bug in -A when -k = 0
 # 1.12 Dec 21      - add -B
 # 1.11 Dec 11      - add -k for -A
 # 1.10 Dec 07      - fix bug in getcontinue() to use query_json()
@@ -10,7 +12,7 @@
 # 1.03 Jun 16      - add spamblacklist error to printResult()
 # 1.02 Jun 15      - fix removefile(), urlencodeawk(), printResult()
 # 1.01 Jun 14      - new version of urlElement() + new subs() and splits()
-# 1.0  Jun 12      - add edit functions -E, -R and -I
+# 1.00 Jun 12      - add edit functions -E, -R and -I
 #                    add OAuth 
 #                    add new functions (randomnumber,splitx,etc)
 #                    add new JSON library
