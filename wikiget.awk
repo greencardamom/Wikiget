@@ -53,8 +53,8 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.13 \
-                 copyright = 2016-2019 \
+                 version   = 1.15 \
+                 copyright = 2016-2020 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
@@ -66,6 +66,10 @@ BEGIN {
                                                                 #  They do the same, need at least one available in PATH
                                                                 #  For edit (-E) wget is required
     Optind = Opterr = 1                                         
+
+    # randomnumber() seed
+    _cliff_seed = "0.00" splitx(sprintf("%f", systime() * 0.000001), ".", 2)
+
     parsecommandline()
 
 }
@@ -130,6 +134,10 @@ function parsecommandline(c,opts,Arguments) {
             Arguments["starttime"] = verifyval(Optarg)
         if (c == "e")                                 #  -e <time>       End time for -u (required w/ -u)
             Arguments["endtime"] = verifyval(Optarg)
+        if (c == "i")                                 #  -i <regex>      Edit comment must include this regex match
+            Arguments["inccomments"] = verifyval(Optarg)
+        if (c == "j")                                 #  -j <regex>      Edit comment must exclude this regex match
+            Arguments["exccomments"] = verifyval(Optarg)
         if (c == "n")                                 #  -n <namespace>  Namespace for -u, -a and -x (option)
             Arguments["namespace"] = verifyval(Optarg)
    
@@ -292,6 +300,11 @@ function processarguments(Arguments,   c,a,i) {
     else
         G["cattypes"] = "p"
 
+    if(! empty(Arguments["inccomments"]))
+      G["inccomments"] = Arguments["inccomments"]
+    if(! empty(Arguments["exccomments"]))
+      G["exccomments"] = Arguments["exccomments"]
+
     if (Arguments["debug"])                                    # Enable debugging
         G["debug"] = 1
 
@@ -411,6 +424,8 @@ function usage(die) {
     print "         -s <starttime> Start time in YMD format (-s 20150101). Required with -u"
     print "         -e <endtime>   End time in YMD format (-e 20151231). If same as -s," 
     print "                         does 24hr range. Required with -u"
+    print "         -i <regex>     (option) Edit comment must include regex match"
+    print "         -j <regex>     (option) Edit comment must exclude regex match"
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -507,6 +522,8 @@ function usage_extended() {
     print "     wikiget -u \"Jimbo Wales\" -s 20010910 -e 20010912" 
     print "   show all edits during the 24hrs of 9/11" 
     print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010911"  
+    print "   show all edits when the edit-comment starts with 'A' " 
+    print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010911 -i \"^A\""  
     print "   articles only"
     print "     wikiget -u \"Jimbo Wales\" -s 20010911 -e 20010930 -n 0"
     print "   talk pages only"
@@ -756,7 +773,7 @@ function getcategory(url, entity,   jsonin, jsonout, continuecode) {
             return ""
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin, "cmcontinue")
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -804,7 +821,7 @@ function getxlinks(url, entity, euprotocol,     jsonin, jsonout, continuecode) {
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin,"eucontinue")
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -845,7 +862,7 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin,"rccontinue")
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2var(jsonin)
@@ -879,13 +896,13 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
-        jsonout = json2var(jsonin)
+        jsonout = json2varUcontribs(jsonin)
         continuecode = getcontinue(jsonin,"uccontinue")
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
-            jsonout = jsonout "\n" json2var(jsonin)
+            jsonout = jsonout "\n" json2varUcontribs(jsonin)
             continuecode = getcontinue(jsonin,"uccontinue")
         }
 
@@ -935,7 +952,7 @@ function getrdchanges(url, entity,         jsonin, jsonout, continuecode) {
         jsonout = json2varRd(jsonin)
         continuecode = getcontinue(jsonin,"rdcontinue")
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&prop=redirects&rdprop=title&rdcontinue=" urlencodeawk(continuecode) "&titles=" urlencodeawk(entity) "&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=500&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2varRd(jsonin)
@@ -988,7 +1005,7 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin, method)
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
 
             if ( method == "eicontinue" )
                 url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&formatversion=2&maxlag=" G["maxlag"]
@@ -1113,7 +1130,7 @@ function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continu
             }
         }
 
-        while ( continuecode ) {
+        while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             continuecode = getcontinue(jsonin,"apcontinue")
@@ -1277,6 +1294,48 @@ function json2var(json,  jsona,arr) {
 }
 
 #
+# Uncontribs version
+#
+function json2varUcontribs(json,  jsona, arrTitle, arrComment, arr, i, j) {
+
+    delete arr
+    if (query_json(json, jsona) >= 0) {
+        splitja(jsona, arrTitle, 3, "title")
+        splitja(jsona, arrComment, 3, "parsedcomment")
+        # awkenough_dump(jsona, "jsona")
+        for(i = 1; i <= length(arrComment); i++) {
+
+          if(! empty(G["inccomments"]) && ! empty(G["exccomments"]) ) {
+            if(arrComment[i] ~ G["inccomments"] && arrComment[i] !~ G["exccomments"]) {
+              j++
+              arr[j] = arrTitle[i]   
+            }
+          }
+          else if(! empty(G["inccomments"])) {
+            if(arrComment[i] ~ G["inccomments"] ) {
+              j++
+              arr[j] = arrTitle[i]
+            }
+          }         
+          else if(! empty(G["exccomments"])) {
+            if(arrComment[i] !~ G["exccomments"] ) {
+              j++
+              arr[j] = arrTitle[i]
+            }
+          }
+          else if( empty(G["exccomments"]) && empty(G["inccomments"])) {
+            j++
+            arr[j] = arrTitle[i]
+          }
+        }
+        return join(arr, 1, length(arr), "\n")
+    }
+
+}
+
+
+
+#
 # json2varRd - given raw json extract field "title" and convert to \n seperated string - for API:Redirects
 #
 function json2varRd(json,  jsona,arr) {
@@ -1297,7 +1356,7 @@ function getcontinue(jsonin, method,    jsona,id) {
           if(!empty(id))
             return id
         }
-        return 0
+        return "-1-1!!-1-1" # Random string unlikely to be the name of a Wiki article
 }
 
 #
@@ -2425,7 +2484,7 @@ function getEditToken(  sp,jsona,command,data) {
 
 }
 
-function moveArticle(from,to,reason,    sp,jsona,data,command) {
+function movePage(from,to,reason,    sp,jsona,data,command) {
 
     setupEdit()
     data = strip("action=move&bot&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&reason=" urlencodeawk(reason, "rawphp") "&movetalk=&token=" urlencodeawk(getEditToken()) )

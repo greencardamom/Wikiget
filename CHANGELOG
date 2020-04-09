@@ -1,5 +1,8 @@
 # Changes in reverse chronological order
 #
+# 1.15 Apr 08 2020 - add optional -i and -j functions used with -u
+#                  - add random seed
+#                  - fix bug in getcontinue() when page name is "0", "0.0" etc.
 # 1.14 Jun 08      - fix bug in -R (page move)
 # 1.13 Jan 13 2019 - fix bug in -A when -k = 0
 # 1.12 Dec 21      - add -B
