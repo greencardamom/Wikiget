@@ -1737,7 +1737,7 @@ function join(arr, start, end, sep,    result, i) {
 #       https://www.gnu.org/software/gawk/manual/html_node/Controlling-Scanning.html
 #   . spliti() does reverse
 #
-function join2(arr, sep, sortkey,         i,lobster) {
+function join2(arr, sep, sortkey,         i,lobster,result) {
 
     if (!empty(sortkey)) {
         if ("sorted_in" in PROCINFO)

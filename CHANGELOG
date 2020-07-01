@@ -1,5 +1,7 @@
 # Changes in reverse chronological order
 #
+#
+# 1.16 Jun 30      - fix bug in join2()
 # 1.15 Apr 08 2020 - add optional -i and -j functions used with -u
 #                  - add random seed
 #                  - fix bug in getcontinue() when page name is "0", "0.0" etc.
