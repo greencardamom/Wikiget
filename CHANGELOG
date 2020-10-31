@@ -1,6 +1,7 @@
 # Changes in reverse chronological order
 #
 #
+# 1.17 Oct 31      - add -i and -j option for use with -r 
 # 1.16 Jun 30      - fix bug in join2()
 # 1.15 Apr 08 2020 - add optional -i and -j functions used with -u
 #                  - add random seed

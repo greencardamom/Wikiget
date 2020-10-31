@@ -13,10 +13,10 @@ template (backlinks), or articles edited by a username (user contributions). Wge
 
 Wikiget options and examples:
 
-	Wikiget - command-line access to Wikimedia API functions
-
+	Wikiget - command-line access to some Wikimedia API functions
+	
 	Usage:
-
+	
 	 Backlinks:
 	       -b <name>        Backlinks for article, template, userpage, etc..
 	         -t <types>     (option) 1-3 letter string of types of backlinks:
@@ -25,9 +25,10 @@ Wikiget options and examples:
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
+	
 	 Forward-links:
 	       -F <name>        Forward-links for article, template, userpage, etc..
-
+	
 	 Redirects:
 	       -B <name>        Redirects for article, template, userpage, etc..
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace(s)
@@ -39,6 +40,19 @@ Wikiget options and examples:
 	         -s <starttime> Start time in YMD format (-s 20150101). Required with -u
 	         -e <endtime>   End time in YMD format (-e 20151231). If same as -s,
 	                         does 24hr range. Required with -u
+	         -i <regex>     (option) Edit comment must include regex match
+	         -j <regex>     (option) Edit comment must exclude regex match
+	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
+	                         Only list pages in this namespace. Default: 0
+	                         See -h for NS codes and examples
+	
+	 Recent changes:
+	       -r               Recent changes (past 30 days) aka Special:RecentChanges
+	                         Either -o or -t required
+	         -o <username>  Only list changes made by this user
+	         -k <tag>       Only list changes tagged with this tag
+	         -i <regex>     (option) Edit comment must include regex match
+	         -j <regex>     (option) Edit comment must exclude regex match
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
@@ -69,15 +83,6 @@ Wikiget options and examples:
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
 	
-	 Recent changes:
-	       -r               Recent changes (past 30 days) aka Special:RecentChanges
-	                         Either -o or -t required
-	         -o <username>  Only list changes made by this user
-	         -k <tag>       Only list changes tagged with this tag
-	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
-	                         Only list pages in this namespace. Default: 0
-	                         See -h for NS codes and examples
-	
 	 Print wiki text:
 	       -w <article>     Print wiki text of article
 	         -p             (option) Plain-text version (strip wiki markup)
@@ -95,7 +100,7 @@ Wikiget options and examples:
 	       -E <title>       Edit a page with this title. Requires -S and -P
 	         -S <summary>   Edit summary
 	         -P <filename>  Page content filename. If "STDIN" read from stdin
-	                         See EDITSETUP for authentication instructions
+	                         See EDITSETUP for authentication configuration
 	
 	       -R <page>        Move from page name. Requires -T
 	         -T <page>      Move to page name
@@ -106,16 +111,15 @@ Wikiget options and examples:
 	       -l <language>    Wiki language code (default: en)
 	                         See https://en.wikipedia.org/wiki/List_of_Wikipedias
 	       -z <project>     Wiki project (default: wikipedia)
-	                         See https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects
+	                         https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects
 	       -m <#>           API maxlag value (default: 5)
 	                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter
 	       -y               Print debugging to stderr (show URLs sent to API)
 	       -V               Version and copyright
 	       -h               Help with examples
-
-
+	
 	Examples:
-
+	
 	 Backlinks:
 	   for a User: showing all link types ("ntf")
 	     wikiget -b "User:Jimbo Wales"
@@ -133,6 +137,8 @@ Wikiget options and examples:
 	     wikiget -u "Jimbo Wales" -s 20010910 -e 20010912
 	   show all edits during the 24hrs of 9/11
 	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010911
+	   show all edits when the edit-comment starts with 'A' 
+	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010911 -i "^A"
 	   articles only
 	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010930 -n 0
 	   talk pages only
@@ -141,6 +147,13 @@ Wikiget options and examples:
 	     wikiget -u "Jimbo Wales" -s 20010911 -e 20010930 -n "0|1"
 	
 	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
+	
+	 Recent changes:
+	   show edits for prior 30 days by IABot made under someone else's name
+	   (ie. OAuth) with an edit summary including this target word
+	     wikiget -k "OAuth CID: 1804" -r -i "Bluelinking"
+	
+	   CID list: https://en.wikipedia.org/wiki/Special:Tags
 	
 	 Category list:
 	   pages in a category
@@ -167,15 +180,11 @@ Wikiget options and examples:
 	   search docs: https://www.mediawiki.org/wiki/Help:CirrusSearch
 	   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces
 	
-	 External links:
+	 External link list:
 	   list articles containing a URL with this domain
 	     wikiget -x "news.yahoo.com"
 	   list articles in NS 1 containing a URL with this domain
 	     wikiget -x "*.yahoo.com" -n 1
-	
-	 Recent changes:
-	   recent changes in last 30 days tagged with this ID
-	     wikiget -r -k "OAuth CID: 678"
 	
 	 All pages:
 	   all page titles excluding redirects w/debug tracking progress

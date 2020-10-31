@@ -53,7 +53,7 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.15 \
+                 version   = 1.16 \
                  copyright = 2016-2020 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -430,6 +430,17 @@ function usage(die) {
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
     print ""
+    print " Recent changes:"
+    print "       -r               Recent changes (past 30 days) aka Special:RecentChanges" 
+    print "                         Either -o or -t required"
+    print "         -o <username>  Only list changes made by this user"
+    print "         -k <tag>       Only list changes tagged with this tag"
+    print "         -i <regex>     (option) Edit comment must include regex match"
+    print "         -j <regex>     (option) Edit comment must exclude regex match"
+    print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
+    print "                         Only list pages in this namespace. Default: 0"
+    print "                         See -h for NS codes and examples"
+    print ""
     print " Category list:"
     print "       -c <category>    List articles in a category"
     print "         -q <types>     (option) 1-3 letter string of types of links: "
@@ -452,15 +463,6 @@ function usage(die) {
     print "                        Works with domain-name only. To search for a full URI use" 
     print "                          regex. eg. -a \"insource:/http:\\/\\/gq.com\\/home.htm/\""  
     print "                        To include subdomains use wildcards: \"-x *.domain.com\""
-    print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
-    print "                         Only list pages in this namespace. Default: 0"
-    print "                         See -h for NS codes and examples"
-    print ""
-    print " Recent changes:"
-    print "       -r               Recent changes (past 30 days) aka Special:RecentChanges" 
-    print "                         Either -o or -t required"
-    print "         -o <username>  Only list changes made by this user"
-    print "         -k <tag>       Only list changes tagged with this tag"
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -533,6 +535,13 @@ function usage_extended() {
     print ""
     print "   -n codes: https://www.mediawiki.org/wiki/Extension_default_namespaces"
     print ""
+    print " Recent changes:"
+    print "   show edits for prior 30 days by IABot made under someone else's name"
+    print "   (ie. OAuth) with an edit summary including this target word"
+    print "     wikiget -k \"OAuth CID: 1804\" -r -i \"Bluelinking\""
+    print ""
+    print "   CID list: https://en.wikipedia.org/wiki/Special:Tags"
+    print ""
     print " Category list:"
     print "   pages in a category"
     print "     wikiget -c \"Category:1900 births\""
@@ -563,10 +572,6 @@ function usage_extended() {
     print "     wikiget -x \"news.yahoo.com\""
     print "   list articles in NS 1 containing a URL with this domain"
     print "     wikiget -x \"*.yahoo.com\" -n 1"
-    print ""
-    print " Recent changes:"
-    print "   recent changes in last 30 days tagged with this ID"
-    print "     wikiget -r -k \"OAuth CID: 678\""
     print ""
     print " All pages:"
     print "   all page titles excluding redirects w/debug tracking progress"
@@ -846,7 +851,7 @@ function rechanges(username, tag,      url, results, entity) {
         else 
             return 0
 
-        url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq( getrechanges(url, entity) )
 
@@ -859,13 +864,14 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
-        jsonout = json2var(jsonin)
+        jsonout = json2varUcontribs(jsonin)
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=recentchanges&rcprop=title" entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+
+            url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
-            jsonout = jsonout "\n" json2var(jsonin)
+            jsonout = jsonout "\n" json2varUcontribs(jsonin)
             continuecode = getcontinue(jsonin,"rccontinue")
         }
 
@@ -1104,11 +1110,15 @@ function allPages(redirtype,    url,results,apfilterredir,aplimit) {
 
         url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
-        results = uniq( getallpages(url, apfilterredir, aplimit) )
+        if(G["maxpages"] > 0) {
+          results = uniq( getallpages(url, apfilterredir, aplimit) )
+          if ( length(results) > 0)
+              print results
+          return length(results)
+        }
+        else
+          getallpages(url, apfilterredir, aplimit)
 
-        if ( length(results) > 0) 
-            print results
-        return length(results)
 }
 function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continuecode, count) {
 
@@ -1134,23 +1144,26 @@ function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continu
             url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             continuecode = getcontinue(jsonin,"apcontinue")
-            if ( ! empty(json2var(jsonin))) { 
-
-                if ( ! empty(jsonout)) 
-                    jsonout = jsonout "\n" json2var(jsonin)
-                else 
-                    jsonout = json2var(jsonin)
+            if ( ! empty(json2var(jsonin))) {
 
                 if (G["maxpages"] > 0) {
+                  if ( ! empty(jsonout))
+                      jsonout = jsonout "\n" json2var(jsonin)
+                  else
+                      jsonout = json2var(jsonin)
                   count = count + split(json2var(jsonin), a, "\n")
-                  if ( count > G["maxpages"])  
+                  if ( count > G["maxpages"])
                       return trimjsonout(jsonout)
                   else if ( count == G["maxpages"])
                       return jsonout
                 }
+                else
+                  print json2var(jsonin)
             }
         }
-        return jsonout
+        if (G["maxpages"] > 0)
+          return jsonout
+
 }
 function trimjsonout(jsonout,  newout,c,i,a) {
 
@@ -2445,6 +2458,10 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
     postfile = genPostfile(data)
     command = "wget " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
     sp = sys2var(command)
+
+    # Sometimes when sending large files or when the Wikimedia servers are very busy, sp will come back blank even though the edit went through.
+    #  Your calling application should be prepared for getting a blank result string and try again.
+    #  It may fail on the second try due to "nochange" since it worked on the first round (but returned a blank result string)
 
     if (G["debug"]) {
         print "\nEDITARTICLE\n------"
