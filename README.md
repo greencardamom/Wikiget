@@ -245,8 +245,6 @@ Credits
 ==================
 by User:GreenC (en.wikipedia.org)
 
-First version: November 2016
-
 MIT License
 
 Wikiget is part of the BotWikiAwk framework of tools and libraries for building and running bots on Wikipedia

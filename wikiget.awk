@@ -53,8 +53,8 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.16 \
-                 copyright = 2016-2020 \
+                 version   = 1.18 \
+                 copyright = 2016-2021 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
@@ -237,7 +237,7 @@ function processarguments(Arguments,   c,a,i) {
     else
         G["maxsearch"] = 10000
 
-    if (isanumber(Arguments["namespace"])) 
+    if (isanumber(Arguments["namespace"]) || Arguments["namespace"] ~ "[|]") 
         G["namespace"] = Arguments["namespace"]
     else
         G["namespace"] = "0"
@@ -597,7 +597,7 @@ function usage_extended() {
 }
 function version() {
     print G["program"] " " G["version"]
-    print "Copyright (C) 2016-2018 User:GreenC (en.wikipedia.org)"
+    print "Copyright (C) " G["copyright"] " User:GreenC (en.wikipedia.org)"
     print
     print "The MIT License (MIT)"
     print
