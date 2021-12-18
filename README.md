@@ -105,6 +105,7 @@ Wikiget options and examples:
 	       -R <page>        Move from page name. Requires -T
 	         -T <page>      Move to page name
 	
+	       -G <page>        Purge page
 	       -I               Show OAuth userinfo
 	
 	 Global options:

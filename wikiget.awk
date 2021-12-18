@@ -7,7 +7,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2016-2018 by User:GreenC (at en.wikipedia.org)
+# Copyright (c) 2016-2022 by User:GreenC (at en.wikipedia.org)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy      
 # of this software and associated documentation files (the "Software"), to deal   
@@ -53,8 +53,8 @@ BEGIN {
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.18 \
-                 copyright = 2016-2021 \
+                 version   = 1.19 \
+                 copyright = 2016-2022 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
@@ -72,6 +72,7 @@ BEGIN {
 
     parsecommandline()
 
+
 }
 
 # [[ ________ Command line parsing and argument processing ___________________ ]]
@@ -81,7 +82,7 @@ BEGIN {
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:AB:")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:AB:G:")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -138,6 +139,7 @@ function parsecommandline(c,opts,Arguments) {
             Arguments["inccomments"] = verifyval(Optarg)
         if (c == "j")                                 #  -j <regex>      Edit comment must exclude this regex match
             Arguments["exccomments"] = verifyval(Optarg)
+        
         if (c == "n")                                 #  -n <namespace>  Namespace for -u, -a and -x (option)
             Arguments["namespace"] = verifyval(Optarg)
    
@@ -187,6 +189,11 @@ function parsecommandline(c,opts,Arguments) {
         }
         if (c == "T")                                 #  -T <page>       Move to page name
             Arguments["moveto"] = verifyval(Optarg)
+
+        if (c == "G") {                               #  -G <page>       Purge page
+            Arguments["main_c"] = "G"
+            Arguments["title"] = verifyval(Optarg)
+        }
 
         if (c == "I")                                 #  -I              User info
             Arguments["main_c"] = "I"
@@ -321,6 +328,13 @@ function processarguments(Arguments,   c,a,i) {
     }
     else if (Arguments["main_c"] == "I") {                     # OAuth userinfo
         userInfo()
+    }
+    else if (Arguments["main_c"] == "G") {                     # purge page
+        if (empty(Arguments["title"])) {
+            stdErr("Missing page title")
+            usage(1)
+        }
+        purgePage(Arguments["title"])
     }
     else if (Arguments["main_c"] == "R") {                     # move page
         if (empty(Arguments["summary"])) {
@@ -489,6 +503,7 @@ function usage(die) {
     print "       -R <page>        Move from page name. Requires -T"
     print "         -T <page>      Move to page name"
     print ""
+    print "       -G <page>        Purge page"
     print "       -I               Show OAuth userinfo"
     print ""
     print " Global options:"
@@ -592,6 +607,8 @@ function usage_extended() {
     print "     wikiget -E \"Paris\" -S \"Fix spelling\" -P \"/home/paris.ws\""
     print "   Input via stdin"
     print "     cat /home/paris.ws | wikiget -E \"Paris\" -S \"Fix spelling\" -P STDIN"
+    print "   Purge page"
+    print "     wikiget -G \"Paris\""
     print ""
  
 }
@@ -868,7 +885,6 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-
             url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             jsonout = jsonout "\n" json2varUcontribs(jsonin)
@@ -1112,11 +1128,11 @@ function allPages(redirtype,    url,results,apfilterredir,aplimit) {
 
         if(G["maxpages"] > 0) {
           results = uniq( getallpages(url, apfilterredir, aplimit) )
-          if ( length(results) > 0)
+          if ( length(results) > 0) 
               print results
           return length(results)
         }
-        else
+        else 
           getallpages(url, apfilterredir, aplimit)
 
 }
@@ -1129,30 +1145,31 @@ function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continu
 
         if ( ! empty(json2var(jsonin))) {
 
-            jsonout = json2var(jsonin)
-
             if (G["maxpages"] > 0) {                     # if -k is anything but 0, break out if maxpages is reached
+              jsonout = json2var(jsonin)
               count = count + split(json2var(jsonin), a, "\n")
               if ( count > G["maxpages"])  
                   return trimjsonout(jsonout)
               else if ( count == G["maxpages"])
                   return jsonout
             }
+            else
+              print json2var(jsonin)
         }
 
         while ( continuecode != "-1-1!!-1-1" ) {
             url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             continuecode = getcontinue(jsonin,"apcontinue")
-            if ( ! empty(json2var(jsonin))) {
+            if ( ! empty(json2var(jsonin))) { 
 
                 if (G["maxpages"] > 0) {
-                  if ( ! empty(jsonout))
+                  if ( ! empty(jsonout)) 
                       jsonout = jsonout "\n" json2var(jsonin)
-                  else
+                  else 
                       jsonout = json2var(jsonin)
                   count = count + split(json2var(jsonin), a, "\n")
-                  if ( count > G["maxpages"])
+                  if ( count > G["maxpages"])  
                       return trimjsonout(jsonout)
                   else if ( count == G["maxpages"])
                       return jsonout
@@ -1163,7 +1180,6 @@ function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continu
         }
         if (G["maxpages"] > 0)
           return jsonout
-
 }
 function trimjsonout(jsonout,  newout,c,i,a) {
 
@@ -1307,10 +1323,10 @@ function json2var(json,  jsona,arr) {
 }
 
 #
-# Uncontribs version
+# Uncontribs version 
 #
 function json2varUcontribs(json,  jsona, arrTitle, arrComment, arr, i, j) {
-
+    
     delete arr
     if (query_json(json, jsona) >= 0) {
         splitja(jsona, arrTitle, 3, "title")
@@ -1321,7 +1337,7 @@ function json2varUcontribs(json,  jsona, arrTitle, arrComment, arr, i, j) {
           if(! empty(G["inccomments"]) && ! empty(G["exccomments"]) ) {
             if(arrComment[i] ~ G["inccomments"] && arrComment[i] !~ G["exccomments"]) {
               j++
-              arr[j] = arrTitle[i]   
+              arr[j] = arrTitle[i]
             }
           }
           else if(! empty(G["inccomments"])) {
@@ -1329,7 +1345,7 @@ function json2varUcontribs(json,  jsona, arrTitle, arrComment, arr, i, j) {
               j++
               arr[j] = arrTitle[i]
             }
-          }         
+          }
           else if(! empty(G["exccomments"])) {
             if(arrComment[i] !~ G["exccomments"] ) {
               j++
@@ -1345,8 +1361,6 @@ function json2varUcontribs(json,  jsona, arrTitle, arrComment, arr, i, j) {
     }
 
 }
-
-
 
 #
 # json2varRd - given raw json extract field "title" and convert to \n seperated string - for API:Redirects
@@ -2397,7 +2411,7 @@ function splitja(jsonarr, arr, indexn, value) {
 
 function setupEdit(   cookiejar) {
 
- # OAuth credentials
+ # OAuth credentials - add here
 
     G["consumerKey"]    = ""
     G["consumerSecret"] = ""
@@ -2459,8 +2473,8 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
     command = "wget " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
     sp = sys2var(command)
 
-    # Sometimes when sending large files or when the Wikimedia servers are very busy, sp will come back blank even though the edit went through.
-    #  Your calling application should be prepared for getting a blank result string and try again.
+    # Sometimes when sending large files or when the Wikimedia servers are very busy, sp will come back blank even though the edit went through. 
+    #  Your calling application should be prepared for getting a blank result string and try again. 
     #  It may fail on the second try due to "nochange" since it worked on the first round (but returned a blank result string)
 
     if (G["debug"]) {
@@ -2522,6 +2536,36 @@ function movePage(from,to,reason,    sp,jsona,data,command) {
 }
 
 #
+# purgePage() - issue a purge on a page title
+#  https://www.mediawiki.org/wiki/API:Purge
+#
+function purgePage(title,    sp,jsona,data,command) {
+
+    setupEdit()
+    data = strip("action=purge&titles=" urlencodeawk(title, "rawphp") "&format=json")
+    postfile = genPostfile(data)
+    command = "wget " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
+    sp = sys2var(command)
+
+    if (G["debug"]) {
+        print "\nPURGEARTICLE\n------"
+        print command
+        print "   ---JSON---"
+        query_json(sp, jsona)
+        awkenough_dump(jsona, "jsona")
+        print "   ---RAW---"
+        print sp 
+    }
+    if (! G["debug"]) {
+        removefile2(postfile)
+        removefile2(outfile)
+    }
+
+    printResult(sp)
+
+}
+
+#
 # userInfo() - user info via API
 #  https://www.mediawiki.org/wiki/API:userinfo
 #
@@ -2559,6 +2603,8 @@ function printResult(json,  jsona,nc,sc) {
         print jsona["edit","spamblacklist"]
       else if( !empty(jsona["move","from"]) && !empty(jsona["move","to"]) )
         print "Page moved from " shquote(jsona["move","from"]) " -> " shquote(jsona["move","to"])
+      else if( !empty(jsona["purge","1","title"]) && empty(jsona["purge","1","missing"]) )
+        print "Page purged: " jsona["purge","1","title"]
       else
         print "Unknown error"
     }
