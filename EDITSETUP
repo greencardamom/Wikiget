@@ -19,7 +19,6 @@ The edit (-E) feature requires an account with bot-flag permissions and OAuth ow
         . Check the box for edit permissions
        If you ever need to add/change permissions, the old key/secrets are discarded and new ones registered
 
-. Add the provided Keys and Secrets to wikiget. Search wikiget.awk for 'OAuth credentials' shows where to add them.
-
+. Add the provided Keys and Secrets to wikiget in the "Program cfg" section
 
 

@@ -7,7 +7,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2016-2022 by User:GreenC (at en.wikipedia.org)
+# Copyright (c) 2016-2024 by User:GreenC (at en.wikipedia.org)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy      
 # of this software and associated documentation files (the "Software"), to deal   
@@ -49,12 +49,12 @@
 
 # [[ ________ Global system vars _____________________________________________ ]]
 
-BEGIN {
+BEGIN { # Program cfg
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.19 \
-                 copyright = 2016-2022 \
+                 version   = 1.20 \
+                 copyright = 2016-2024 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
@@ -70,10 +70,20 @@ BEGIN {
     # randomnumber() seed
     _cliff_seed = "0.00" splitx(sprintf("%f", systime() * 0.000001), ".", 2)
 
-    parsecommandline()
-
+    # Optional OAuth consumer keys. See EDITSETUP for more info
+    G["consumerKey"]    = ""
+    G["consumerSecret"] = ""
+    G["accessKey"]      = ""
+    G["accessSecret"]   = ""
 
 }
+
+BEGIN { # Program run
+
+    parsecommandline()
+
+}
+
 
 # [[ ________ Command line parsing and argument processing ___________________ ]]
 
@@ -1449,22 +1459,29 @@ function uniq(names,    b,c,i,x) {
         return join2(x,"\n")
 }
 
-
 #
 # Webpage to variable. url is assumed to be percent encoded.
 #
-function http2var(url) {
+function http2var(url,  tries,i,op) {
 
         if (G["debug"])
-            print url > "/dev/stderr"
+            print url > "/dev/stderr"                            
 
-        if (G["wta"] == "wget") 
-            return sys2var("wget --no-check-certificate --user-agent=\"" G["agent"] "\" -q -O- -- " shquote(url) )
-        else if (G["wta"] == "curl")
-            return sys2var("curl -L -s -k --user-agent \"" G["agent"] "\" -- " shquote(url) )
-        else if (G["wta"] == "lynx")
-            return sys2var("lynx -source -- " shquote(url) )
-}
+        tries = 3
+        if(url ~ "(wikipedia|wikimedia)")
+            tries = 20
+
+        for(i = 1; i <= tries; i++) {
+            if (G["wta"] == "wget")
+                op = sys2var("wget --no-check-certificate --user-agent=\"" G["agent"] "\" -q -O- -- " shquote(url) )  
+            else if (G["wta"] == "curl")
+                op = sys2var("curl -L -s -k --user-agent \"" G["agent"] "\" -- " shquote(url) )  
+            else if (G["wta"] == "lynx")
+                op = sys2var("lynx -source -- " shquote(url) )  
+            if(!empty(op)) return op
+        }
+}        
+
 
 # [[ ________ Library ________________________________________________________ ]]
 
@@ -2411,12 +2428,7 @@ function splitja(jsonarr, arr, indexn, value) {
 
 function setupEdit(   cookiejar) {
 
- # OAuth credentials - add here
-
-    G["consumerKey"]    = ""
-    G["consumerSecret"] = ""
-    G["accessKey"]      = ""
-    G["accessSecret"]   = ""
+ # OAuth credentials
 
     if (empty(G["consumerKey"])) {
         stdErr("No account. See EDITSETUP for login/authentication info.")
