@@ -7,7 +7,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2016-2025 by User:GreenC (at en.wikipedia.org)
+# Copyright (c) 2016-2024 by User:GreenC (at en.wikipedia.org)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy      
 # of this software and associated documentation files (the "Software"), to deal   
@@ -53,39 +53,28 @@ BEGIN { # Program cfg
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.21 \
-                 copyright = 2016-2025 \
+                 version   = 1.20 \
+                 copyright = 2016-2024 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
                  project   = wikipedia"
 
     asplit(G, _defaults, "[ ]*[=][ ]*", "[ ]{9,}")
-                                 
+
     setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
                                                                 #  They do the same, need at least one available in PATH
                                                                 #  For edit (-E) wget is required
-    Optind = Opterr = 1                                         
+    Optind = Opterr = 1
 
     # randomnumber() seed
     _cliff_seed = "0.00" splitx(sprintf("%f", systime() * 0.000001), ".", 2)
 
-    # Optional OAuth consumer keys. See EDITSETUP for more info. 
-
-    # Create the files below with secure permissions to store your secrets:
-
-    #   mkdir /home/user/.config/wikiget
-    #   mkdir /home/user/.config/wikiget/secrets
-    #   chmod 700 /home/user/.config/wikiget/secrets
-    #   chmod 600 mybot.consumerkey
-    #   chmod 600 mybot.consumersecret
-    #   chmod 600 mybot.accesskey
-    #   chmod 600 mybot.accesssecret
-
-    G["consumerKey"]    = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumerkey"))
-    G["consumerSecret"] = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumersecret"))
-    G["accessKey"]      = strip(readfile("/home/user/.config/wikiget/secrets/mybot.accesskey"))
-    G["accessSecret"]   = strip(readfile("/home/user/.config/wikiget/secrets/mybot.accesssecret"))
+    # Optional OAuth consumer keys. See EDITSETUP for more info                 
+    G["consumerKey"]    = strip(readfile("/home/greenc/toolforge/scripts/secrets/greencbot.consumerkey"))
+    G["consumerSecret"] = strip(readfile("/home/greenc/toolforge/scripts/secrets/greencbot.consumersecret"))
+    G["accessKey"]      = strip(readfile("/home/greenc/toolforge/scripts/secrets/greencbot.accesskey"))
+    G["accessSecret"]   = strip(readfile("/home/greenc/toolforge/scripts/secrets/greencbot.accesssecret"))
 
 }
 
@@ -94,7 +83,6 @@ BEGIN { # Program run
     parsecommandline()
 
 }
-
 
 # [[ ________ Command line parsing and argument processing ___________________ ]]
 
@@ -1472,7 +1460,7 @@ function uniq(names,    b,c,i,x) {
         c = split(names, b, "\n")
         names = "" # free memory
         while (i++ < c) {
-            gsub(/\\"/,"\"",b[i])
+            gsub(/\\["]/,"\"",b[i])
             if (b[i] ~ "for API usage") { # Max lag exceeded.
                 stdErr("\nMax lag (" G["maxlag"] ") exceeded - aborting. Try again when API servers are less busy, or increase Maxlag (-m)")
                 exit

@@ -1,6 +1,8 @@
 # Changes in reverse chronological order
 #
 #
+# 1.21 Dec 06 2024 - fix regex statements generating warnings under newer awk versions
+#                  - add secure location to store OAuth secrets
 # 1.20 Dec 16 2023 - minor changes 
 # 1.19 Dec 19      - add -G page purge for mass purges
 # 1.18 May 29 2021 - fix bug in -n with multiple namespaces
