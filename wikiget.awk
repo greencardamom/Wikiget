@@ -53,7 +53,7 @@ BEGIN { # Program cfg
 
     _defaults = "contact   = User:GreenC -> en.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.21 \
+                 version   = 1.22 \
                  copyright = 2016-2025 \
                  agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
@@ -1141,79 +1141,63 @@ function allPages(redirtype,    url,results,apfilterredir,aplimit) {
             apfilterredir = "nonredirects"
 
         if (G["maxpages"] < 500 && G["maxpages"] > 0)
-            aplimit = G["maxpages"] + G["maxpages"]  # get extra in case redirs are filtered 
+            aplimit = G["maxpages"] + G["maxpages"]  # get extra in case redirs are filtered
         else
             aplimit = 500
 
         url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
-        if(G["maxpages"] > 0) {
-          results = uniq( getallpages(url, apfilterredir, aplimit) )
-          if ( length(results) > 0) 
-              print results
-          return length(results)
-        }
-        else 
-          getallpages(url, apfilterredir, aplimit)
-
+        getallpages(url, apfilterredir, aplimit)
 }
-function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continuecode, count) {
+function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continuecode, count, pages_printed, pages_in_buffer, a, i) {
+
+        pages_printed = 0
 
         jsonin = http2var(url)
         if ( apierror(jsonin, "json") > 0)
-            return ""
+            return
         continuecode = getcontinue(jsonin,"apcontinue")
 
-        if ( ! empty(json2var(jsonin))) {
-
-            if (G["maxpages"] > 0) {                     # if -k is anything but 0, break out if maxpages is reached
-              jsonout = json2var(jsonin)
-              count = count + split(json2var(jsonin), a, "\n")
-              if ( count > G["maxpages"])  
-                  return trimjsonout(jsonout)
-              else if ( count == G["maxpages"])
-                  return jsonout
+        jsonout = json2var(jsonin)
+        if ( ! empty(jsonout)) {
+            pages_in_buffer = split(jsonout, a, "\n")
+            if (G["maxpages"] > 0) {
+                if (pages_printed + pages_in_buffer >= G["maxpages"]) {
+                    for(i = 1; i <= G["maxpages"] - pages_printed; i++) {
+                        if ( ! empty(a[i])) print a[i]
+                    }
+                    return
+                }
             }
-            else
-              print json2var(jsonin)
+            print jsonout
+            pages_printed += pages_in_buffer
         }
 
         while ( continuecode != "-1-1!!-1-1" ) {
+            if (G["maxpages"] > 0 && pages_printed >= G["maxpages"]) {
+                return
+            }
+
             url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
             continuecode = getcontinue(jsonin,"apcontinue")
-            if ( ! empty(json2var(jsonin))) { 
+            jsonout = json2var(jsonin)
 
+            if ( ! empty(jsonout)) {
+                pages_in_buffer = split(jsonout, a, "\n")
                 if (G["maxpages"] > 0) {
-                  if ( ! empty(jsonout)) 
-                      jsonout = jsonout "\n" json2var(jsonin)
-                  else 
-                      jsonout = json2var(jsonin)
-                  count = count + split(json2var(jsonin), a, "\n")
-                  if ( count > G["maxpages"])  
-                      return trimjsonout(jsonout)
-                  else if ( count == G["maxpages"])
-                      return jsonout
+                    if (pages_printed + pages_in_buffer >= G["maxpages"]) {
+                        for(i = 1; i <= G["maxpages"] - pages_printed; i++) {
+                            if ( ! empty(a[i])) print a[i]
+                        }
+                        return
+                    }
                 }
-                else
-                  print json2var(jsonin)
+                print jsonout
+                pages_printed += pages_in_buffer
             }
+            jsonin = "" # free memory
         }
-        if (G["maxpages"] > 0)
-          return jsonout
-}
-function trimjsonout(jsonout,  newout,c,i,a) {
-
-        c = split(jsonout, a, "\n")
-        for(i = 1; i <= G["maxpages"]; i++) {
-            if ( ! empty(a[i])) {
-                if ( i == 1)
-                    newout = a[i]
-                else if ( i > 1)
-                    newout = newout "\n" a[i]
-            }
-        }
-        return newout  
 }
 
 

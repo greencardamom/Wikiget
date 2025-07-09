@@ -1,6 +1,7 @@
 # Changes in reverse chronological order
 #
 #
+# 1.22 Jul 08 2025 - improve memory management in getallpages()
 # 1.21 Dec 06 2024 - fix regex statements generating warnings under newer awk versions
 #                  - add secure location to store OAuth secrets
 # 1.20 Dec 16 2023 - minor changes 
