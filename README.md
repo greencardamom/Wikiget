@@ -218,7 +218,7 @@ Optionally create a symlink: ln -s wikiget.awk wikiget
 
 Change hashbang (first line) to location of GNU Awk 4+  - use 'which gawk' to see where it is on your system.
 
-Change the "Contact" line to your Wikipedia Username (optional or leave blank)
+Change the agent "Contact" line to your Wikipedia Username (near the top of the program). It's vital to have correct contact information per WMF bot policy. API calls may fail with missing Agent information.
 
 Requires one of the following to be in the path: wget, curl or lynx (use 'which wget' to see where it is on your system)
 

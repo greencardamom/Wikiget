@@ -1,6 +1,9 @@
 # Changes in reverse chronological order
 #
 #
+# 1.30 Aug 17      - MAJOR BUG: Agent string was not correctly defined. This caused API calls
+#                    to fail or partly. Ensure the G["agent"] string is correctly defined
+#                    with your contact information. See near the top of the program.
 # 1.22 Jul 08 2025 - improve memory management in getallpages()
 # 1.21 Dec 06 2024 - fix regex statements generating warnings under newer awk versions
 #                  - add secure location to store OAuth secrets

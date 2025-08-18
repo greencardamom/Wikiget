@@ -51,16 +51,16 @@
 
 BEGIN { # Program cfg
 
-    _defaults = "contact   = User:GreenC -> en.wikipedia.org \
+    _defaults = "contact   = User:MY_NAME @ MYSITE.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.22 \
+                 version   = 1.3 \
                  copyright = 2016-2025 \
-                 agent     = " G["program"] " " G["version"] " " G["contact"] "\
                  maxlag    = 5 \
                  lang      = en \
                  project   = wikipedia"
 
     asplit(G, _defaults, "[ ]*[=][ ]*", "[ ]{9,}")
+    G["agent"] = G["program"] " " G["version"] " " G["contact"]
                                  
     setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
                                                                 #  They do the same, need at least one available in PATH
