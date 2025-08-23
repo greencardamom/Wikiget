@@ -53,7 +53,7 @@ BEGIN { # Program cfg
 
     _defaults = "contact   = User:MY_NAME @ MYSITE.wikipedia.org \
                  program   = Wikiget \
-                 version   = 1.3 \
+                 version   = 1.31 \
                  copyright = 2016-2025 \
                  maxlag    = 5 \
                  lang      = en \
@@ -2493,7 +2493,7 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
 
     data = strip("action=edit&bot=&format=json&text=" text "&title=" urlencodeawk(title, "rawphp") "&summary=" urlencodeawk(summary, "rawphp") "&token=" urlencodeawk(getEditToken()) )
     postfile = genPostfile(data)
-    command = "wget " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
+    command = "wget --user-agent=" shquote(G["agent"]) " " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
     sp = sys2var(command)
 
     # Sometimes when sending large files or when the Wikimedia servers are very busy, sp will come back blank even though the edit went through. 
@@ -2567,7 +2567,7 @@ function purgePage(title,    sp,jsona,data,command) {
     setupEdit()
     data = strip("action=purge&titles=" urlencodeawk(title, "rawphp") "&format=json")
     postfile = genPostfile(data)
-    command = "wget " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
+    command = "wget --user-agent=" shquote(G["agent"]) " " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"]) 
     sp = sys2var(command)
 
     if (G["debug"]) {
@@ -2649,7 +2649,7 @@ function genPostfile(data,  outfile) {
 #
 function apiurl(data,  command,wget_opts) {
 
-    command = "wget " cookieopts " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-data=" shquote(data) " -q -O- " shquote(G["apiURL"]) 
+    command = "wget --user-agent=" shquote(G["agent"]) " " cookieopts " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-data=" shquote(data) " -q -O- " shquote(G["apiURL"]) 
     if (G["debug"])
         stdErr(command)
     return command
