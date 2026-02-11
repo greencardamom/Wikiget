@@ -51,20 +51,28 @@
 
 BEGIN { # Program cfg
 
-    _defaults = "contact   = User:MY_NAME @ MYSITE.wikipedia.org \
+    _defaults = "contact   = User:MY_NAME \
+                 emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.31 \
-                 copyright = 2016-2025 \
-                 maxlag    = 5 \
+                 version   = 1.32 \
+                 copyright = 2016-2026 \
+                 maxlag    = 10 \
                  lang      = en \
                  project   = wikipedia"
 
+    # Create a file containing your email address (a single line) and link that file in 'emailfp' above
+
     asplit(G, _defaults, "[ ]*[=][ ]*", "[ ]{9,}")
-    G["agent"] = G["program"] " " G["version"] " " G["contact"]
+
+    # Agent string format non-compliance could result in 429 (too many requests) rejections by WMF API
+    G["agent"] = G["program"] "-" G["version"] "-" G["copyright"] " (" G["contact"] "; mailto:" strip(readfile(G["emailfp"])) ")"
+
+    # wget options (GET)
+    G["wget_opts"]=" --user-agent=\"" G["agent"] "\" --referer=\"https://en.wikipedia.org/wiki/Main_Page\" --no-cookies --ignore-length --no-check-certificate --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429"
                                  
     setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
                                                                 #  They do the same, need at least one available in PATH
-                                                                #  For edit (-E) wget is required
+                                                                #  For edit (-E) wget is required.
     Optind = Opterr = 1                                         
 
     # randomnumber() seed
@@ -1484,7 +1492,7 @@ function http2var(url,  tries,i,op) {
 
         for(i = 1; i <= tries; i++) {
             if (G["wta"] == "wget")
-                op = sys2var("wget --no-check-certificate --user-agent=\"" G["agent"] "\" -q -O- -- " shquote(url) )  
+                op = sys2var("wget " G["wget_opts"] " -q -O- -- " shquote(url) )  
             else if (G["wta"] == "curl")
                 op = sys2var("curl -L -s -k --user-agent \"" G["agent"] "\" -- " shquote(url) )  
             else if (G["wta"] == "lynx")

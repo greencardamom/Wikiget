@@ -218,7 +218,13 @@ Optionally create a symlink: ln -s wikiget.awk wikiget
 
 Change hashbang (first line) to location of GNU Awk 4+  - use 'which gawk' to see where it is on your system.
 
-Change the agent "Contact" line to your Wikipedia Username (near the top of the program). It's vital to have correct contact information per WMF bot policy. API calls may fail with missing Agent information.
+Change the agent "contact" line to your Wikipedia Username (near the top of the program). 
+
+Create a text file anywhere containing a single line with your email address; to be used by the agent string. 
+
+Add the text file path location to the "emailfp" configuration option.
+
+It's vital to have correct contact information per WMF bot policy. WMF API calls may fail with User Agent information that is non-compliant.
 
 Requires one of the following to be in the path: wget, curl or lynx (use 'which wget' to see where it is on your system)
 

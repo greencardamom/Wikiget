@@ -1,6 +1,9 @@
 # Changes in reverse chronological order
 #
 #
+# 1.32 Feb 11 2026 - improve default agent string
+#                    add G["wget_opts"] to lessen chance of timeouts/429 with WMF API
+#                    add G["emailfp"] in setup 
 # 1.30 Aug 17      - MAJOR BUG: Agent string was not correctly defined. This caused API calls
 #                    to fail or partly. Ensure the G["agent"] string is correctly defined
 #                    with your contact information. See near the top of the program.
