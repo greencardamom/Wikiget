@@ -1,4 +1,4 @@
-#!/usr/local/bin/awk -bE
+#!/usr/bin/awk -bE
 
 #
 # Wikiget - command-line access to Wikimedia API read/write functions
@@ -7,7 +7,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2016-2025 by User:GreenC (at en.wikipedia.org)
+# Copyright (c) 2016-2026 by User:GreenC (at en.wikipedia.org)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy      
 # of this software and associated documentation files (the "Software"), to deal   
