@@ -61,8 +61,13 @@ BEGIN { # Program cfg
                  project   = wikipedia"
 
     # Create a file containing your email address (a single line) and link that file in 'emailfp' above
-
+    
     asplit(G, _defaults, "[ ]*[=][ ]*", "[ ]{9,}")
+
+    if(!exists2(G["emailfp"])) {
+      stdErr("Unable to find email file. Create a file anywhere on your system containing your email address (a single line). Link that /path/to/filename into 'emailfp' at the top of wikiget.awk - required for WMF API authentication.")
+      exit
+    }
 
     # Agent string format non-compliance could result in 429 (too many requests) rejections by WMF API
     G["agent"] = G["program"] "-" G["version"] "-" G["copyright"] " (" G["contact"] "; mailto:" strip(readfile(G["emailfp"])) ")"
