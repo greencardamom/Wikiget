@@ -1,7 +1,8 @@
 # Changes in reverse chronological order
 #
 #
-# 1.32 Feb 11 2026 - improve default agent string
+# 1.34 Mar 19      - improve wget options in editPage() purgePage() apiurl()
+# 1.32 Feb 11 2026 - improve default agent string again
 #                    add G["wget_opts"] to lessen chance of timeouts/429 with WMF API
 #                    add G["emailfp"] in setup 
 # 1.30 Aug 17      - MAJOR BUG: Agent string was not correctly defined. This caused API calls
