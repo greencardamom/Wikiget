@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.34 \
+                 version   = 1.35 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -2554,7 +2554,7 @@ function getEditToken(  sp,jsona,command,data) {
 function movePage(from,to,reason,    sp,jsona,data,command) {
 
     setupEdit()
-    data = strip("action=move&bot&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&reason=" urlencodeawk(reason, "rawphp") "&movetalk=&token=" urlencodeawk(getEditToken()) )
+    data = strip("action=move&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&reason=" urlencodeawk(reason, "rawphp") "&movetalk=&token=" urlencodeawk(getEditToken()) )
     sp = sys2var(apiurl(data))
 
     if (G["debug"]) {

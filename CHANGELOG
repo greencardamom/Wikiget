@@ -1,6 +1,6 @@
 # Changes in reverse chronological order
 #
-#
+# 1.35 Mar 22      - remove stray &bot from movePage() API command
 # 1.34 Mar 19      - improve wget options in editPage() purgePage() apiurl()
 # 1.32 Feb 11 2026 - improve default agent string again
 #                    add G["wget_opts"] to lessen chance of timeouts/429 with WMF API
