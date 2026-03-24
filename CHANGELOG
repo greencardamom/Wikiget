@@ -1,5 +1,7 @@
 # Changes in reverse chronological order
 #
+# 1.35 Mar 23      - fix a 1 in 256 intermittent problem in MWOAuthGenerateHeader() causing 
+#                    OAuth "Invalid signature" error.
 # 1.35 Mar 22      - remove stray &bot from movePage() API command
 # 1.34 Mar 19      - improve wget options in editPage() purgePage() apiurl()
 # 1.32 Feb 11 2026 - improve default agent string again

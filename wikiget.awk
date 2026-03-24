@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.35 \
+                 version   = 1.36 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -2708,11 +2708,9 @@ function MWOAuthGenerateHeader(consumerKey, consumerSecret, accessKey, accessSec
     asplit(signatureBaseParts, "0=" toupper(method) " 1=" url " 2=" join(allParamsJoined, 0, length(allParamsJoined) - 1, "&"))
     signatureBaseString = urlencodeawk(signatureBaseParts[0], "rawphp") "&" urlencodeawk(signatureBaseParts[1], "rawphp") "&" urlencodeawk(signatureBaseParts[2], "rawphp")
 
-  # printf "value" | openssl dgst -sha1 -hmac 'key' -binary
-    hmac = sys2varPipe(signatureBaseString, "openssl sha1 -hmac " shquote(urlencodeawk(consumerSecret, "rawphp") "&" urlencodeawk(accessSecret, "rawphp")) " -binary")
-
-  # printf "hmac" | openssl base64
-    headerParams["oauth_signature"] = strip(sys2varPipe(hmac, "openssl base64") )
+  # Generate HMAC binary and pipe directly to base64 in the shell
+    cmd = "openssl sha1 -hmac " shquote(urlencodeawk(consumerSecret, "rawphp") "&" urlencodeawk(accessSecret, "rawphp")) " -binary | openssl base64"
+    headerParams["oauth_signature"] = strip(sys2varPipe(signatureBaseString, cmd))
 
     for (k in headerParams) 
         header[j++] = urlencodeawk(k, "rawphp") "=" urlencodeawk(headerParams[k], "rawphp")
