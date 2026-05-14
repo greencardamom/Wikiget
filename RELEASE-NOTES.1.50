@@ -1,0 +1,106 @@
+May 15, 2026 - Version 1.50
+
+Notes
+-----
+Since mid-2025 the WMF has been clamping down on API requests due to a flood of AI bots.
+This was mostly solveable with a well-formed User-Agent string.
+Beginning in 2026 this was not enough, by March 2026 the 429s become extreme.
+Experiments showed that API read requests that used OAuth authentication did better.
+The changes in 1.50 are mostly about making the system more stable in this way.
+OAuth consumer keys are freely available and can be generated on the fly - it is highly recommended
+in the world of AI scraper overload. Obtain keys (see EDITSETUP), put them in a safe text file, link
+the text file location at the top of wikiget as explained in the source code. Finally, turn on OAuth by default
+with G["oauth_read"] = 1 
+
+New Features
+----------------
+-U  : This allows sending an API request through wikiget that handles the OAuth for you. Thus if you have 
+      a bash, Python script etc and don't want to bother with OAuth, just system call wikiget -U 
+      and it will resolve the API request using your OAuth credentials. 
+
+            wikiget -U "action=query&meta=siteinfo&format=json"
+            (fully authenticated request using your OAuth credentials)
+      
+-N  : Null-edit a page. 
+
+-Y  : Show debugging info and route to target "stderr", "stdout", or a /file/path (appends).
+
+(max) : API requests now return "max" records (5,000 for bots). This reduces the number of API requests,
+        speeds up the results and reduces the chances of a 429.
+
+-X  : Toggle Toolforge Private Proxy (default: ON/OFF).
+      This is a feature I use for myself. It interfaces with custom software running on Toolforge
+      to further reduce 429s. If interested in learning more drop me a message.
+
+Function changes
+----------------
+
+allPages(): Updated the fallback pagination limit from 500 to the dynamic "max" value.
+
+apierror(): Updated the regex to safely tolerate unpredictable spaces and newlines within WMF JSON error blocks.
+
+apiurl(): Refactored to cleanly handle custom Toolforge proxy routing, repackage OAuth headers, and include expanded retry-on-http-error definitions (429, 502, 503, 504).
+
+apiurlPost() (NEW): Created to cleanly handle API URL building and custom proxy routing when using a file for POST data.
+
+backlinks(): Updated the hardcoded API return limits from 250/500 to the dynamic "max" value.
+
+BEGIN (Global Config): Hardened default wget options to fail faster, enabled OAuth reads by default, implemented global timeout check (max 500s limits), improved missing email configuration path reporting, and initialized Toolforge proxy settings.
+
+category(): Updated the hardcoded API return limits from 500 to the dynamic "max" value. Fixed transient network drop handling.
+
+editPage(): Added stderr capture to catch blank HTTP responses during heavy load and implemented cookiejar cleanup.
+
+getbacklinks(): Updated return limits to "max" and injected an apierror() break condition into the pagination loop.
+
+getcategory(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+getEditToken(): Completely rewritten to include a 3-retry loop with a 5-second sleep and standard error logging for improved stability when fetching CSRF tokens.
+
+getrdchanges(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+getrechanges(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+getucontribs(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+getxlinks(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+http2var(): Completely rewritten to support authenticated OAuth reads, custom proxy routing (repackaging Authorization to X-WMF-OAuth), dynamic maxlag escalation, and heavier linear smart retry backoff logic. Added explicit "Exhaustion Catch" logging. Regex matched Wikipedia URLs broadened to ([.]|/)wiki.
+
+movePage(): Removed a redundant setupEdit() call to save an execution cycle and added cookiejar cleanup.
+
+MWOAuthGenerateHeader(): Upgraded the nonce generator to a cryptographic hex string and optimized the shell piping for HMAC creation. Added strict URL decoding and re-encoding for parameters, fixed header value wrapping with double quotes, and updated the signature base string construction.
+
+nulleditPage() (NEW): Created to issue empty edits that force MediaWiki to refresh category and template links.
+
+Pagination Loops (Global): Multiple pagination loops (categorymembers, etc.) updated to return "" instead of break on transient network drops to safely end the fetch cycle. Fixed URL encoding on continuation parameters.
+
+parsecommandline(): Added getopt parsing for the new -N (Null Edit), -U (Raw API), -O (Toggle OAuth), -X (Toggle Proxy), and -Y (Debug Destination) flags.
+
+printResult(): Added arr to local scope and introduced logic to explicitly parse and report HTTP/Varnish network errors.
+
+processarguments(): Added the routing logic to handle the actions for the new -N, -U, -O, -X, and -Y flags.
+
+purgePage(): Added stderr capture to catch blank HTTP responses during heavy load and implemented cookiejar cleanup.
+
+rawAPI() (NEW): Created to allow users to send custom, fully authenticated API queries directly through the terminal.
+
+rechanges(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+redirects(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+setupEdit(): Appended the process ID (PROCINFO["pid"]) to the cookiejar file to safely allow concurrent script executions.
+
+stdErr(): Updated to support routing output dynamically to stderr, stdout, or appending to a file based on the -Y flag debug destination.
+
+ucontribs(): Updated the hardcoded API return limits from 500 to the dynamic "max" value.
+
+urldecodeawk() (NEW): Added native function to decode percent-encoded strings efficiently.
+
+urlencodeawk(): Fixed the default regex fallback to accurately match PHP's rawurlencode behavior.
+
+usage(): Added visual help text descriptions for the new -N, -O, -U, -X, and -Y command-line flags.
+
+usage_extended(): Added terminal usage examples demonstrating how to use the new custom API request and null edit features.
+
+userInfo(): Refactored to cleanly output the raw JSON payload to stdout for normal CLI usage if debugging is disabled, and added cookiejar cleanup.

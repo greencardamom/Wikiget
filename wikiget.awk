@@ -54,18 +54,17 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.36 \
+                 version   = 1.50 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
                  project   = wikipedia"
 
-    # Create a file containing your email address (a single line) and link that file in 'emailfp' above
-    
     asplit(G, _defaults, "[ ]*[=][ ]*", "[ ]{9,}")
 
+    # Create a file containing your email address (a single line) and link that file in 'emailfp' above
     if(!exists2(G["emailfp"])) {
-      stdErr("Unable to find email file. Create a file anywhere on your system containing your email address (a single line). Link that /path/to/filename into 'emailfp' at the top of wikiget.awk - required for WMF API authentication.")
+      stdErr("Unable to find email file (" G["emailfp"] "). Create a file anywhere on your system containing your email address (a single line). Link that /path/to/filename into 'emailfp' at the top of wikiget.awk - required for WMF API authentication.")
       exit
     }
 
@@ -73,7 +72,7 @@ BEGIN { # Program cfg
     G["agent"] = G["program"] "-" G["version"] "-" G["copyright"] " (" G["contact"] "; mailto:" strip(readfile(G["emailfp"])) ")"
 
     # wget options (GET)
-    G["wget_opts"]=" --user-agent=\"" G["agent"] "\" --referer=\"https://en.wikipedia.org/wiki/Main_Page\" --no-cookies --ignore-length --no-check-certificate --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429"
+    G["wget_opts"]=" --user-agent=\"" G["agent"] "\" --referer=\"https://en.wikipedia.org/wiki/Main_Page\" --no-cookies --ignore-length --no-check-certificate --timeout=120 --tries=1 --content-on-error"
                                  
     setup("wget curl lynx")                                     # Use one of wget, curl or lynx - searches PATH in this order
                                                                 #  They do the same, need at least one available in PATH
@@ -81,10 +80,11 @@ BEGIN { # Program cfg
     Optind = Opterr = 1                                         
 
     # randomnumber() seed
-    _cliff_seed = "0.00" splitx(sprintf("%f", systime() * 0.000001), ".", 2)
+    srand(systime() + PROCINFO["pid"])    
+    _cliff_seed = rand()
+    if (_cliff_seed == 0) _cliff_seed = 0.1 # Safety catch so log() doesn't fail
 
     # Optional OAuth consumer keys. See EDITSETUP for more info. 
-
     # Create the files below with secure permissions to store your secrets:
 
     #   mkdir /home/user/.config/wikiget
@@ -95,10 +95,17 @@ BEGIN { # Program cfg
     #   chmod 600 mybot.accesskey
     #   chmod 600 mybot.accesssecret
 
+    G["oauth_read"] = 0 # OAuth for read requests (1 = enabled, 0 = disabled)
     G["consumerKey"]    = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumerkey"))
     G["consumerSecret"] = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumersecret"))
     G["accessKey"]      = strip(readfile("/home/user/.config/wikiget/secrets/mybot.accesskey"))
     G["accessSecret"]   = strip(readfile("/home/user/.config/wikiget/secrets/mybot.accesssecret"))
+
+    # Toolforge API Private Proxy 
+    G["tfproxy"] = 0    # Route API requests through a private proxy at Toolforge (1 = enabled, 0 = disabled)
+    G["tfproxy_url"]      = strip(readfile("/home/user/.config/wikiget/secrets/tfproxy.url"))
+    G["tfproxy_pass"]     = strip(readfile("/home/user/.config/wikiget/secrets/tfproxy.password"))
+    G["tfproxy_header"]   = strip(readfile("/home/user/.config/wikiget/secrets/tfproxy.header"))
 
 }
 
@@ -108,7 +115,6 @@ BEGIN { # Program run
 
 }
 
-
 # [[ ________ Command line parsing and argument processing ___________________ ]]
 
 #
@@ -116,7 +122,7 @@ BEGIN { # Program run
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "yrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:I:R:T:AB:G:")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "XOIyrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:R:T:AB:G:N:U:Y:")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -228,18 +234,32 @@ function parsecommandline(c,opts,Arguments) {
             Arguments["main_c"] = "G"
             Arguments["title"] = verifyval(Optarg)
         }
-
+        if (c == "N") {                               #  -N <page>       Null edit page
+            Arguments["main_c"] = "N"
+            Arguments["title"] = verifyval(Optarg)
+        }
         if (c == "I")                                 #  -I              User info
             Arguments["main_c"] = "I"
-
         if (c == "m")                                 #  -m <maxlag>     Maxlag setting when using API, default set in BEGIN{} section
             Arguments["maxlag"] = verifyval(Optarg)
         if (c == "l")                                 #  -l <lang>       Language code, default set in BEGIN{} section
             Arguments["lang"] = verifyval(Optarg)
         if (c == "z")                                 #  -z <project>    Project name, default set in BEGIN{} section
             Arguments["project"] = verifyval(Optarg)
+        if (c == "U") {                               #  -U <url>        Raw API request
+            Arguments["api_url"] = verifyval(Optarg)
+            Arguments["main_c"] = "U"
+        }
+        if (c == "O")                                 #  -O              Toggle OAuth for read requests
+            Arguments["toggle_oauth"] = 1
+        if (c == "X")                                 #  -X              Toggle Toolforge proxy
+            Arguments["toggle_tfproxy"] = 1
         if (c == "y")                                 #  -y              Show debugging info to stderr
             Arguments["debug"] = 1
+        if (c == "Y") {                               #  -Y <target>     Show debugging info and route to target "stdout" or <filename>
+            Arguments["debug"] = 1
+            Arguments["debug_dest"] = verifyval(Optarg)
+        }
         if (c == "V") {                               #  -V              Version and copyright info.
             version()
             exit
@@ -256,11 +276,21 @@ function parsecommandline(c,opts,Arguments) {
 #
 function processarguments(Arguments,   c,a,i) {
 
+    if (Arguments["toggle_oauth"]) {
+        if (G["oauth_read"] == 1) G["oauth_read"] = 0
+        else G["oauth_read"] = 1
+    }
+
+    if (Arguments["toggle_tfproxy"]) {
+        if (G["tfproxy"] == 1) G["tfproxy"] = 0
+        else G["tfproxy"] = 1
+    }
+
     if (length(Arguments["lang"]) > 0)                                # Check options, set defaults
         G["lang"] = Arguments["lang"]
         # default set in BEGIN{}
 
-    if (length(Arguments["project"]) > 0)                             # Check options, set defaults
+    if (length(Arguments["project"]) > 0)
         G["project"] = Arguments["project"]
         # default set in BEGIN{}
 
@@ -346,8 +376,13 @@ function processarguments(Arguments,   c,a,i) {
     if(! empty(Arguments["exccomments"]))
       G["exccomments"] = Arguments["exccomments"]
 
-    if (Arguments["debug"])                                    # Enable debugging
+    if (Arguments["debug"]) {                                  # Enable debugging
         G["debug"] = 1
+        if (!empty(Arguments["debug_dest"]))
+            G["debug_dest"] = Arguments["debug_dest"]
+        else
+            G["debug_dest"] = "stderr"
+    }
 
     G["apiURL"] = "https://" G["lang"] "." G["project"] ".org/w/api.php?"
 
@@ -370,7 +405,15 @@ function processarguments(Arguments,   c,a,i) {
         }
         purgePage(Arguments["title"])
     }
+    else if (Arguments["main_c"] == "N") {                     # nulledit page
+        if (empty(Arguments["title"])) {
+            stdErr("Missing page title")
+            usage(1)
+        }
+        nulleditPage(Arguments["title"])
+    }
     else if (Arguments["main_c"] == "R") {                     # move page
+
         if (empty(Arguments["summary"])) {
           stdErr("Missing -S (reason for move)")
           usage(1)
@@ -423,7 +466,7 @@ function processarguments(Arguments,   c,a,i) {
         if (! rechanges(Arguments["username"],Arguments["tags"]) )
             stdErr("No recent changes found.")
     }
-
+    
     else if (Arguments["main_c"] == "w") {                     # wiki text
         if (entity_exists(Arguments["main"]) ) {
             if (G["plaintext"] == "true")
@@ -436,8 +479,12 @@ function processarguments(Arguments,   c,a,i) {
             exit
         }
     }
+    else if (Arguments["main_c"] == "U") {                     # Raw API URL
+        rawAPI(Arguments["api_url"])
+    }
     else 
         usage(1)
+
 }
 
 #
@@ -528,6 +575,13 @@ function usage(die) {
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
     print ""
+    print " API request:"
+    print "        -U <url>         Send a custom API query. Uses OAuth authentication, if enabled."
+    print "                         Will deftly handle maxlag, retry and pause loops."
+    print "                         Can be the full URL, or just the query string."
+    print "                         Example: wikiget -U \"action=query&meta=siteinfo&format=json\""
+    print "                         Note: URL values must be percent-encoded (e.g., %20 for spaces)."
+    print ""
     print " Edit page:"
     print "       -E <title>       Edit a page with this title. Requires -S and -P"
     print "         -S <summary>   Edit summary"
@@ -538,6 +592,7 @@ function usage(die) {
     print "         -T <page>      Move to page name"
     print ""
     print "       -G <page>        Purge page"
+    print "       -N <page>        Null edit page (forces category/template refresh)"
     print "       -I               Show OAuth userinfo"
     print ""
     print " Global options:"
@@ -547,7 +602,10 @@ function usage(die) {
     print "                         https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects"
     print "       -m <#>           API maxlag value (default: " G["maxlag"] ")"
     print "                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
+    print "       -O               Toggle OAuth for read requests (default: " (G["oauth_read"] == 1 ? "ON" : "OFF") ")"
+    print "       -X               Toggle Toolforge Private Proxy (default: " (G["tfproxy"] == 1 ? "ON" : "OFF") ")"
     print "       -y               Print debugging to stderr (show URLs sent to API)"
+    print "       -Y <target>      Print debugging to target: stderr, stdout, or a /file/path (appends)"
     print "       -V               Version and copyright"
     print "       -h               Help with examples"
     print ""
@@ -756,9 +814,19 @@ function setup(files_system) {
 # Verify existence of programs in path
 # Return 0 if fail.
 #
-function files_verify(files_system,    a, i, missing) {
+function files_verify(files_system,    a, i, missing, to_path) {
 
     missing = 0
+
+    # --- Hardcoded timeout check ---
+    to_path = strip(sys2var("command -v timeout"))
+    if (!empty(to_path)) {
+        # wget max time: 3 tries * 120s timeout + 2 * 60s waitretry = 480s.
+        G["timeout"] = to_path " 500s "
+    } else {
+        G["timeout"] = ""
+    }
+    
     split(files_system, a, " ")
     for ( i in a ) {
         if (! sys2var(sprintf("command -v %s",a[i])) ) {
@@ -814,24 +882,31 @@ function category(entity,   ct, url, results) {
         ct = strip(ct)
         gsub(/[ ]/,"|",ct)
  
-        url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=500&format=json&formatversion=2&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=max&format=json&formatversion=2&maxlag=" G["maxlag"]
 
-        results = uniq(getcategory(url, entity) )
+        # Pass 'ct' to getcategory to preserve types during pagination
+        results = uniq(getcategory(url, entity, ct) )
 
         if ( length(results) > 0)
             print results
         return length(results)
 }
-function getcategory(url, entity,   jsonin, jsonout, continuecode) {
+function getcategory(url, entity, ct,    jsonin, jsonout, continuecode) {
 
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
         jsonout = json2var(jsonin)
         continuecode = getcontinue(jsonin, "cmcontinue")
+        
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=page&cmprop=title&cmlimit=500&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=-||&cmcontinue=" continuecode 
+            url = G["apiURL"] "action=query&list=categorymembers&cmtitle=" urlencodeawk(entity) "&cmtype=" urlencodeawk(ct) "&cmprop=title&cmlimit=max&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&cmcontinue=" urlencodeawk(continuecode, "rawphp")
+            
             jsonin = http2var(url)
+            
+            if (apierror(jsonin, "json") > 0)
+                return ""
+                
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin, "cmcontinue")
         }
@@ -858,8 +933,10 @@ function xlinks(entity,   url,results,a,c,i) {
         c = split("http|https|ftp|ftps|sftp", a, /[|]/)
         # iterate for euprotocol=a[i]
         for(i = 1; i <= c; i++) {
-          url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(a[i]) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
-          results = results "\n" getxlinks(url, entity, "http") 
+          url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(a[i]) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+          
+          # Pass a[i] to preserve the correct protocol during pagination
+          results = results "\n" getxlinks(url, entity, a[i]) 
         }
 
         results = uniq( results )
@@ -878,8 +955,13 @@ function getxlinks(url, entity, euprotocol,     jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"eucontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=500&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
+            url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
+            
             jsonin = http2var(url)
+            
+            if (apierror(jsonin, "json") > 0)
+                return ""
+                
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin,"eucontinue")
 
@@ -902,7 +984,7 @@ function rechanges(username, tag,      url, results, entity) {
         else 
             return 0
 
-        url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=500&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=max&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq( getrechanges(url, entity) )
 
@@ -919,14 +1001,20 @@ function getrechanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rccontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=500&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=recentchanges&rcprop=" urlencodeawk("title|parsedcomment") entity "&rclimit=max&continue=" urlencodeawk("-||") "&rccontinue=" urlencodeawk(continuecode) "&rcnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            
             jsonin = http2var(url)
+            
+            if (apierror(jsonin, "json") > 0)
+                return ""
+                
             jsonout = jsonout "\n" json2varUcontribs(jsonin)
             continuecode = getcontinue(jsonin,"rccontinue")
         }
 
         return jsonout
 }
+
 
 # ___ User Contributions (-u) 
 
@@ -939,7 +1027,7 @@ function ucontribs(entity,sdate,edate,      url, results) {
         # API stopped working with User: prefix sometime in April 2018
         sub(/^[Uu]ser[:]/, "", entity)
 
-        url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=max&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
         results = uniq( getucontribs(url, entity, sdate, edate) )
 
@@ -956,8 +1044,13 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         continuecode = getcontinue(jsonin,"uccontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=500&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=usercontribs&ucuser=" urlencodeawk(entity) "&uclimit=max&continue=" urlencodeawk("-||") "&uccontinue=" urlencodeawk(continuecode) "&ucstart=" urlencodeawk(sdate) "&ucend=" urlencodeawk(edate) "&ucdir=newer&ucnamespace=" urlencodeawk(G["namespace"]) "&ucprop=" urlencodeawk("title|parsedcomment") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            
             jsonin = http2var(url)
+            
+            if (apierror(jsonin, "json") > 0)
+                return ""
+                
             jsonout = jsonout "\n" json2varUcontribs(jsonin)
             continuecode = getcontinue(jsonin,"uccontinue")
         }
@@ -965,23 +1058,54 @@ function getucontribs(url, entity, sdate, edate,         jsonin, jsonout, contin
         return jsonout
 }
 
+
 # ___ Forward links (-F) 
 
 #
 # MediaWiki API:Parsing_wikitext
 #  https://www.mediawiki.org/wiki/API:Parsing_wikitext
 #
-function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
+# ___ Forward links (-F) 
 
-        url = G["apiURL"] "action=parse&prop=" urlencodeawk("links") "&page=" urlencodeawk(entity) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+#
+# MediaWiki API:Links
+#  https://www.mediawiki.org/wiki/API:Links
+#
+function forlinks(entity,      url, results) {
+
+        url = G["apiURL"] "action=query&generator=links&titles=" urlencodeawk(entity) "&gpllimit=max&gplnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+
+        results = uniq( getforlinks(url, entity) )
+
+        if ( length(results) > 0) 
+            print results
+        return length(results)        
+}
+function getforlinks(url, entity,      jsonin, jsonout, continuecode) {
+
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
         jsonout = json2var(jsonin)
-        if ( length(jsonout) > 0) 
-            print jsonout
-        return length(jsonout)       
+        continuecode = getcontinue(jsonin,"gplcontinue")
+
+        while ( continuecode != "-1-1!!-1-1" ) {
+        
+            # Note: &generator requires "&continue=gplcontinue||" and not "&continue=-||"
+            url = G["apiURL"] "action=query&generator=links&titles=" urlencodeawk(entity) "&gpllimit=max&gplnamespace=" urlencodeawk(G["namespace"]) "&continue=" urlencodeawk("gplcontinue||") "&gplcontinue=" urlencodeawk(continuecode, "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
+            
+            jsonin = http2var(url)
+            
+            if (apierror(jsonin, "json") > 0)
+                return ""
+                
+            jsonout = jsonout "\n" json2var(jsonin)
+            continuecode = getcontinue(jsonin,"gplcontinue")
+        }
+
+        return jsonout
 }
+
 
 # ___ Redirects (-B) 
 # Note: Must set namespace - will only return for the given namespace
@@ -992,7 +1116,7 @@ function forlinks(entity,sdate,edate,      url,jsonin,jsonout) {
 #
 function redirects(entity,      url, results) {
 
-        url = G["apiURL"] "action=query&prop=redirects&titles=" urlencodeawk(entity) "&rdprop=title&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=500&maxlag=" G["maxlag"]
+        url = G["apiURL"] "action=query&prop=redirects&titles=" urlencodeawk(entity) "&rdprop=title&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=max&maxlag=" G["maxlag"]
 
         results = uniq( getrdchanges(url, entity) )
 
@@ -1009,8 +1133,12 @@ function getrdchanges(url, entity,         jsonin, jsonout, continuecode) {
         continuecode = getcontinue(jsonin,"rdcontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&prop=redirects&rdprop=title&rdcontinue=" urlencodeawk(continuecode) "&titles=" urlencodeawk(entity) "&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=500&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&prop=redirects&rdprop=title&rdcontinue=" urlencodeawk(continuecode) "&titles=" urlencodeawk(entity) "&rdnamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&rdlimit=max&maxlag=" G["maxlag"]
             jsonin = http2var(url)
+
+            if (apierror(jsonin, "json") > 0)
+                return ""
+            
             jsonout = jsonout "\n" json2varRd(jsonin)
             continuecode = getcontinue(jsonin,"rdcontinue")
         }
@@ -1027,19 +1155,19 @@ function getrdchanges(url, entity,         jsonin, jsonout, continuecode) {
 function backlinks(entity,      url, blinks) {
 
         if (G["bltypes"] ~ /n/) {
-            url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=max&continue=&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             blinks = getbacklinks(url, entity, "blcontinue") # normal backlinks
         }
 
         if ( entity ~ /^[Tt]emplate[:]/ && G["bltypes"] ~ /t/) {    # transclusion backlinks
-            url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=500&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&continue=&eilimit=max&format=json&formatversion=2&maxlag=" G["maxlag"]
             if (length(blinks) > 0)
                 blinks = blinks "\n" getbacklinks(url, entity, "eicontinue")
             else
                 blinks = getbacklinks(url, entity, "eicontinue")
         } 
         else if ( entity ~ /^[Ff]ile[:]/ && G["bltypes"] ~ /f/) { # file backlinks
-            url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
+            url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=max&continue=&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             if (length(blinks) > 0)
                 blinks = blinks "\n" getbacklinks(url, entity, "iucontinue")
             else
@@ -1064,13 +1192,15 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
         while ( continuecode != "-1-1!!-1-1" ) {
 
             if ( method == "eicontinue" )
-                url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=500&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=embeddedin&eititle=" urlencodeawk(entity) "&einamespace=" urlencodeawk(G["namespace"]) "&eilimit=max&continue=" urlencodeawk("-||") "&eicontinue=" urlencodeawk(continuecode) "&format=json&formatversion=2&maxlag=" G["maxlag"]
             if ( method == "iucontinue" )
-                url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=250&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=imageusage&iutitle=" urlencodeawk(entity) "&iunamespace=" urlencodeawk(G["namespace"]) "&iuredirect&iulimit=max&continue=" urlencodeawk("-||") "&iucontinue=" urlencodeawk(continuecode) "&iufilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
             if ( method == "blcontinue" )
-                url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=250&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
+                url = G["apiURL"] "action=query&list=backlinks&bltitle=" urlencodeawk(entity) "&blnamespace=" urlencodeawk(G["namespace"]) "&blredirect&bllimit=max&continue=" urlencodeawk("-||") "&blcontinue=" urlencodeawk(continuecode) "&blfilterredir=nonredirects&format=json&formatversion=2&maxlag=" G["maxlag"]
 
             jsonin = http2var(url)
+            if (apierror(jsonin, "json") > 0)
+                return ""
             jsonout = jsonout "\n" json2var(jsonin)
             continuecode = getcontinue(jsonin, method)
         }
@@ -1085,55 +1215,57 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
 #  MediaWiki API Extension:TextExtracts
 #   https://www.mediawiki.org/wiki/Extension:TextExtracts
 #
-function wikitextplain(namewiki,   command,f,r,redirurl,xmlin,i,c,b,k) {
+function wikitextplain(namewiki,    command,f,target_title,xmlin,c,b,k) {
 
         command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
         f = http2var(command)
-        if (length(f) < 5) 
+        if (empty(f)) 
             return ""
-        if (tolower(f) ~ /[#][ ]{0,}redirect[ ]{0,}[[]/ && G["followredirect"] == "true") {
-            match(f, /[#][ ]{0,}[Rr][Ee][^]]*[]]/, r)
-            gsub(/[#][ ]{0,}[Rr][Ee][Dd][Ii][^[]*[[]/,"",r[0])
-            redirurl = strip(substr(r[0], 2, length(r[0]) - 2))
-            command = G["apiURL"] "format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(redirurl) 
-            xmlin = http2var(command)
-        }
-        else {
-            command = G["apiURL"] "format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(namewiki)
-            xmlin = http2var(command)
-        }
 
-        if (apierror(xmlin, "xml") > 0) {
+        target_title = wikitext_helper(f)
+        if (empty(target_title)) 
+            target_title = namewiki
+
+        command = G["apiURL"] "format=xml&action=query&prop=extracts&exlimit=1&explaintext&titles=" urlencodeawk(target_title) 
+        xmlin = http2var(command)
+
+        if (apierror(xmlin, "xml") > 0) 
             return ""
+        
+        c = split(convertxml(xmlin), b, "<extract[^>]*>")
+        if (c > 1) {
+            k = substr(b[2], 1, match(b[2], "</extract>") - 1)
+            return strip(k)
         }
-        else {
-            c = split(convertxml(xmlin), b, "<extract[^>]*>")
-            i = 1
-            while (i++ < c) {
-                k = substr(b[i], 1, match(b[i], "</extract>") - 1)
-                return strip(k)
-            }
-        }
+        
+        return ""
 }
-
-function wikitext(namewiki,   command,f,r,redirurl) {
+function wikitext(namewiki,    command,f,target_title) {
 
         command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
         f = http2var(command)
-        if (length(f) < 5) 
+        if (empty(f)) 
             return ""
 
-        if (tolower(f) ~ /[#][ ]{0,}redirect[ ]{0,}[[]/ && G["followredirect"] == "true") {
-            match(f, /[#][ ]{0,}[Rr][Ee][^]]*[]]/, r)
-            gsub(/[#][ ]{0,}[Rr][Ee][Dd][Ii][^[]*[[]/,"",r[0])
-            redirurl = strip(substr(r[0], 2, length(r[0]) - 2))
-            command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(redirurl) "&action=raw"
+        target_title = wikitext_helper(f)
+        if (!empty(target_title)) {
+            command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(target_title) "&action=raw"
             f = http2var(command)
         }
-        if (length(f) < 5)
+        
+        if (empty(f))
             return ""
         else
             return f
+}
+function wikitext_helper(text,    r) {
+        if (G["followredirect"] == "true" && tolower(text) ~ /#[ ]*redir/) {
+            if (match(text, /#[ ]*[Rr][Ee][^]]*[]]/, r) > 0) {
+                gsub(/#[ ]*[Rr][Ee][Dd][Ii][^[]*[[]/, "", r[0])
+                return strip(substr(r[0], 2, length(r[0]) - 2))
+            }
+        }
+        return ""
 }
 
 # ___ All pages (-A)
@@ -1156,7 +1288,7 @@ function allPages(redirtype,    url,results,apfilterredir,aplimit) {
         if (G["maxpages"] < 500 && G["maxpages"] > 0)
             aplimit = G["maxpages"] + G["maxpages"]  # get extra in case redirs are filtered
         else
-            aplimit = 500
+            aplimit = "max"
 
         url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&format=json&formatversion=2&maxlag=" G["maxlag"]
 
@@ -1193,6 +1325,10 @@ function getallpages(url,apfilterredir,aplimit,         jsonin, jsonout, continu
 
             url = G["apiURL"] "action=query&list=allpages&aplimit=" aplimit "&apfilterredir=" apfilterredir "&apnamespace=" urlencodeawk(G["namespace"], "rawphp") "&apcontinue=" urlencodeawk(continuecode, "rawphp") "&continue=" urlencodeawk("-||") "&format=json&formatversion=2&maxlag=" G["maxlag"]
             jsonin = http2var(url)
+
+            if (apierror(jsonin, "json") > 0)
+                return ""
+            
             continuecode = getcontinue(jsonin,"apcontinue")
             jsonout = json2var(jsonin)
 
@@ -1260,6 +1396,10 @@ function getsearch(url, srchstr,   xmlin,xmlout,offset,retrieved) {
         while ( offset) {
             url = G["apiURL"] "action=query&list=search&srsearch=" urlencodeawk(srchstr) "&srprop=" urlencodeawk(G["srprop"]) "&srnamespace=" urlencodeawk(G["namespace"]) "&srlimit=50&continue=" urlencodeawk("-||") "&format=xml&maxlag=" G["maxlag"] "&sroffset=" offset
             xmlin = http2var(url)
+
+            if (apierror(xmlin, "xml") > 0)
+                break
+            
             xmlout = xmlout "\n" parsexmlsearch(xmlin)
             offset = getoffsetxml(xmlin)
             retrieved = retrieved + 50
@@ -1270,11 +1410,6 @@ function getsearch(url, srchstr,   xmlin,xmlout,offset,retrieved) {
         return xmlout
 } 
 function parsexmlsearch(xmlin,   f,g,e,c,a,i,out,snippet,title) {
-
-        if (xmlin ~ /error code="maxlag"/) {
-            stdErr("Max lag (" G["maxlag"] ") exceeded - aborting. Try again when API servers are less busy, or increase Maxlag (-m)")
-            exit
-        }
 
         f = split(xmlin,e,/<search>|<\/search>/)
         c = split(e[2],a,"/>")  
@@ -1298,16 +1433,17 @@ function parsexmlsearch(xmlin,   f,g,e,c,a,i,out,snippet,title) {
         }
         return strip(out)
 }
-function getoffsetxml(xmlin,  a) {
 
-        if ( match(xmlin, /<continue sroffset[=]"[0-9]{1,}"/, offset) > 0) {     
+function getoffsetxml(xmlin,  a, offset) {
+
+        if ( match(xmlin, /<continue sroffset[=]"[0-9]{1,}"/, offset) > 0) {
             split(offset[0],a,/"/)
             return a[2]
         }
         else 
             return ""
 }
-function trimxmlout(xmlout, max,   c,a,i) {
+function trimxmlout(xmlout, max,   c,a,i,out) {
 
         if ( split(xmlout, a, "\n") > 0) {
             while (i++ < max) 
@@ -1315,11 +1451,11 @@ function trimxmlout(xmlout, max,   c,a,i) {
             return out
         }
 }
-function totalhits(xmlin) {
+function totalhits(xmlin,    a, b) {
 
         # <searchinfo totalhits="40"/>
         if (match(xmlin, /<searchinfo totalhits[=]"[0-9]{1,}"/, a) > 0) {
-            if (split(a[0],b,"\"") > 0) 
+            if (split(a[0],b,"\"") > 0)
                 return b[2]
             else
                 return "error"
@@ -1446,14 +1582,16 @@ function apierror(input, type,   pre, code) {
         }
 
         if (type == "json") {
-            if (match(input, /"error"[:]{"code"[:]"[^"]*","info"[:]"[^"]*"/, code) > 0) {
-                stdErr(pre code[0])
+            # Catch "error" blocks even if WMF injects spaces or newlines
+            if (match(input, /"error"[^}]*"code"[: \t]+"[^"]*"/) > 0) {
+                stdErr(pre substr(input, RSTART, RLENGTH))
                 return 1
             }
         }
+
         else if (type == "xml") {
             if (match(input, /error code[=]"[^"]*" info[=]"[^"]*"/, code) > 0) {
-                stdErr(re code[0])
+                stdErr(pre code[0])
                 return 1
             }
         }
@@ -1468,43 +1606,169 @@ function uniq(names,    b,c,i,x) {
 
         c = split(names, b, "\n")
         names = "" # free memory
-        while (i++ < c) {
-            gsub(/\\"/,"\"",b[i])
-            if (b[i] ~ "for API usage") { # Max lag exceeded.
-                stdErr("\nMax lag (" G["maxlag"] ") exceeded - aborting. Try again when API servers are less busy, or increase Maxlag (-m)")
-                exit
+        
+        for (i = 1; i <= c; i++) {
+            gsub(/\\"/, "\"", b[i])
+            if (b[i] != "") {
+                x[b[i]] = "" # The key itself enforces uniqueness
             }
-            if (b[i] == "")
-                continue
-            if (x[b[i]] == "")
-                x[b[i]] = b[i]
         }
+        
         delete b # free memory
-        return join2(x,"\n")
+        return join2(x, "\n")
 }
 
 #
 # Webpage to variable. url is assumed to be percent encoded.
 #
-function http2var(url,  tries,i,op) {
+function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, local_opts, wait, maxlag_val, current_url, final_url) {
 
         if (G["debug"])
-            print url > "/dev/stderr"                            
+            print url > "/dev/stderr"                          
+
+        if (url ~ /'/) gsub(/'/, "%27", url)
+        if (url ~ /’/) gsub(/’/, "%E2%80%99", url)
+
+        # Clean the URL of any pre-existing maxlag parameters
+        gsub(/&maxlag=[0-9]+/, "", url)
+        gsub(/\?maxlag=[0-9]+&/, "?", url)
+        gsub(/\?maxlag=[0-9]+$/, "", url)
 
         tries = 3
-        if(url ~ "(wikipedia|wikimedia)")
+        if(url ~ "([.]|/)wiki")
             tries = 20
 
         for(i = 1; i <= tries; i++) {
+            
+            # Dynamic maxlag escalation
+            maxlag_val = G["maxlag"] + ((i - 1) * 5)
+            
+            if (url ~ /\?/) current_url = url "&maxlag=" maxlag_val
+            else current_url = url "?maxlag=" maxlag_val
+
+            headerCmd = ""
+            wait = 0
+
+            # --- OAUTH & HEADER BUILDER ---
+            if (G["oauth_read"] == 1 && current_url ~ /api\.php/ && !empty(G["consumerKey"]) && !empty(G["accessKey"]) && G["wta"] != "lynx") {
+                if (index(current_url, "?") > 0) {
+                    baseUrl = substr(current_url, 1, index(current_url, "?") - 1)
+                    queryStr = substr(current_url, index(current_url, "?") + 1)
+                } else {
+                    baseUrl = current_url
+                    queryStr = ""
+                }
+                
+                authHeader = MWOAuthGenerateHeader(G["consumerKey"], G["consumerSecret"], G["accessKey"], G["accessSecret"], baseUrl, "GET", queryStr)
+                
+                if (!empty(authHeader)) {
+                    # If proxy is active, repackage the OAuth header
+                    if (G["tfproxy"] == 1 && G["tfproxy_pass"] != "") {
+                        gsub(/^Authorization: /, "X-WMF-OAuth: ", authHeader)
+                    }
+                    
+                    if (G["wta"] == "wget") {
+                        headerCmd = " --header=" shquote(strip(authHeader)) " "
+                    } else if (G["wta"] == "curl") {
+                        headerCmd = " -H " shquote(strip(authHeader)) " "
+                    }
+                }
+            } 
+
+
+            # --- INJECT PROXY AUTH HEADER ---
+            # Only inject the password header if the proxy toggle is ON
+            if (G["tfproxy"] == 1 && G["tfproxy_pass"] != "") {
+                if (G["wta"] == "wget") headerCmd = headerCmd " --header=" shquote(G["tfproxy_header"] ": " G["tfproxy_pass"]) " "
+                else if (G["wta"] == "curl") headerCmd = headerCmd " -H " shquote(G["tfproxy_header"] ": " G["tfproxy_pass"]) " "
+            }
+
+            local_opts = " --user-agent=" shquote(G["agent"]) " --referer=\"https://en.wikipedia.org/wiki/Main_Page\" --no-cookies "
+
+            # --- ROUTING SWITCH ---
+            # Route through proxy ONLY if toggle is ON and password is set
+            if (G["tfproxy"] == 1 && G["tfproxy_pass"] != "") {
+                final_url = G["tfproxy_url"] urlencodeawk(current_url)
+                
+                if (G["debug"]) {
+                    if (G["oauth_read"] == 1) { 
+                        stdErr("http2var: [PROXY ACTIVE] Routing through tfproxy w/ OAuth")
+                    } else {
+                        stdErr("http2var: [PROXY ACTIVE] Routing through tfproxy w/out OAuth")
+                    }
+                }
+            } else {
+                final_url = current_url
+                
+                # Add a clean debug notification when the bypass is used
+                if (G["debug"] && G["tfproxy_pass"] != "" && G["tfproxy"] == 0) {
+                    if (G["oauth_read"] == 1) {
+                        stdErr("http2var: [PROXY BYPASSED] Direct connection w/ OAuth")
+                    } else {
+                        stdErr("http2var: [PROXY BYPASSED] Direct connection w/out OAuth")
+                    }
+                }
+            }
+
+            # --- EXECUTION ---
             if (G["wta"] == "wget")
-                op = sys2var("wget " G["wget_opts"] " -q -O- -- " shquote(url) )  
+                op = sys2var(G["timeout"] " wget " local_opts headerCmd " -q -O- -- " shquote(final_url) )  
             else if (G["wta"] == "curl")
-                op = sys2var("curl -L -s -k --user-agent \"" G["agent"] "\" -- " shquote(url) )  
+                op = sys2var(G["timeout"] " curl --max-time 120 -L -s -k --user-agent " shquote(G["agent"]) " " headerCmd " -- " shquote(final_url) )  
             else if (G["wta"] == "lynx")
-                op = sys2var("lynx -source -- " shquote(url) )  
-            if(!empty(op)) return op
+                op = sys2var("lynx -source -- " shquote(final_url) )  
+            
+            # --- VALIDATION & BACKOFF ---
+            if (!empty(op)) {
+                if (op ~ /"error"[^}]*"code"[: \t]+"[^"]*"/) {
+                    if (op ~ /"maxlag"/ || op ~ /"ratelimited"/) {
+                        if(i > 1 || G["debug"])
+                          stdErr("http2var: [WARNING] API Overload or Rate Limit (Attempt " i ").")
+                        wait = 15 + (i * 10) 
+                    } else if (op ~ /"mwoauth-/) {
+                        if(i > 1 || G["debug"])
+                          stdErr("http2var: [WARNING] Transient OAuth Drop (Attempt " i ")" final_url)
+                        wait = 10 + (i * 5) 
+                    } else {
+                        if(i > 1 || G["debug"])
+                          stdErr("http2var: [FATAL API ERROR] " substr(op, 1, 300))
+                        return op 
+                    }
+                }
+                else if (tolower(op) ~ /^[ \t\n]*(<!doctype html|<html)/) {
+                     if(i > 1 || G["debug"])
+                       stdErr("http2var: [WARNING] WMF Varnish HTML Gateway Error (Attempt " i ").")
+                     wait = 15 + (i * 5) 
+                } 
+                else if (url ~ /format=json/ && op !~ /}[ \t\n]*$/) {
+                     if(i > 1 || G["debug"])
+                       stdErr("http2var: [WARNING] Truncated Payload or Gateway Drop (Attempt " i ").")
+                     wait = 15 + (i * 10)
+                }
+                else {
+                    return op 
+                }
+            } else {
+                if(i > 1 || G["debug"])
+                  stdErr("http2var: [WARNING] Network Timeout or Empty Response (Attempt " i ").")
+                wait = 15 + (i * 10)
+            }
+            
+            if (i < tries && wait > 0) {
+                if(i > 1 || G["debug"])
+                  stdErr("http2var: Retrying in " wait "s... " substr(op, 1, 100))
+                system("sleep " wait)
+            }
         }
-}        
+
+        # --- EXHAUSTION CATCH ---
+        if (G["debug"]) {
+            stdErr("http2var: [ABORT] Maximum retries (" tries ") exhausted. Giving up on URL.")
+        }
+        
+        return ""
+}
+
 
 
 # [[ ________ Library ________________________________________________________ ]]
@@ -1578,46 +1842,74 @@ function sys2varPipe(data, command,   fish, scale, ship) {
 #       "python3 -c \"from urllib.parse import urlsplit; import sys; o = urlsplit(sys.argv[1]); print(o." element ")\" " shquote(url)
 #   . returns full url on error
 #
-function urlElement(url,element,   a,scheme,netloc,tail,b,fragment,query,path) {
+function urlElement(url, element,    a, scheme, netloc, path, query, fragment) {
 
-  if(url ~ /^\/\//)        # Protocol-relative - assume http
-    url = "http:" url
+    if (url ~ /^\/\//) 
+        url = "http:" url
 
-  split(url, a, /\//)
+    # 1. Extract Fragment (everything after #)
+    if (index(url, "#")) {
+        split(url, a, "#")
+        fragment = a[2]
+        url = a[1]
+    }
 
-  scheme = substr(a[1], 0, index(a[1], ":") -1)
-  netloc = a[3]
+    # 2. Extract Query (everything after ?)
+    if (index(url, "?")) {
+        split(url, a, "?")
+        query = a[2]
+        url = a[1]
+    }
 
-  tail = subs(scheme "://" netloc, "", url)
+    # 3. Extract Scheme (everything before ://)
+    if (index(url, "://")) {
+        split(url, a, "://")
+        scheme = a[1]
+        url = a[2]
+    }
 
-  splits(tail, b, "#")
-  if(!empty(b[2]))
-    fragment = b[2]
-
-  splits(tail, b, "?")
-  if(!empty(b[2])) {
-    query = b[2]
-    if(!empty(fragment))
-      query = subs("#" fragment, "", query)
-  }
-
-  path = tail
-  if(!empty(fragment))
-    path = subs("#" fragment, "", path)
-  if(!empty(query))
-    path = subs("?" query, "", path)
+    # 4. Extract Netloc and Path
+    # Now that ? and # are gone, the first / separates the domain from the path
+    if (index(url, "/")) {
+        netloc = substr(url, 1, index(url, "/") - 1)
+        path = substr(url, index(url, "/"))
+    } else {
+        # If there is no slash left, the whole remaining string is the domain
+        netloc = url
+        path = ""
+    }
     
-  if(element == "scheme")
-    return scheme
-  else if(element == "netloc")
-    return netloc
-  else if(element == "path")
-    return path
-  else if(element == "query")
-    return query
-  else if(element == "fragment")
-    return fragment
+    if (element == "scheme") return scheme
+    else if (element == "netloc") return netloc
+    else if (element == "path") return path
+    else if (element == "query") return query
+    else if (element == "fragment") return fragment
 
+    return ""
+}
+
+#
+# urldecodeawk - natively decode percent-encoded strings
+#
+function urldecodeawk(str,  c, len, res, i, hex) {
+    res = ""
+    len = length(str)
+    for (i = 1; i <= len; i++) {
+        c = substr(str, i, 1)
+        if (c == "%" && i + 2 <= len) {
+            hex = substr(str, i + 1, 2)
+            if (hex ~ /^[0-9a-fA-F]{2}$/) {
+                res = res sprintf("%c", strtonum("0x" hex))
+                i += 2
+                continue
+            }
+        } else if (c == "+") {
+            res = res " "
+            continue
+        }
+        res = res c
+    }
+    return res
 }
 
 # 
@@ -1639,7 +1931,7 @@ function urlencodeawk(str,class,  c, len, res, i, ord, re) {
     else if (class == "rawphp")         
         re = "[\\-_.~0-9A-Za-z]"
     else
-        re = "[0-9A-Za-z]"
+        re = "[\\-_.~0-9A-Za-z]"
 
     for (i = 0; i <= 255; i++)
         ord[sprintf("%c", i)] = i        
@@ -1659,16 +1951,16 @@ function urlencodeawk(str,class,  c, len, res, i, ord, re) {
 # concatarray() - merge array a & b into c
 #
 #  . if array a & b have a same key eg. a["1"] = 2 and b["1"] = 3
-#      then b takes precendent eg. c["1"] = 3
+#      then b takes precedent eg. c["1"] = 3
 #
-function concatarray(a,b,c) {
+function concatarray(a, b, c,    i) {
 
     delete c          
     for (i in a)       
-        c[i]=a[i]
+        c[i] = a[i]
     for (i in b)    
-       c[i]=b[i]       
-}                
+        c[i] = b[i]        
+}
 
 #
 # splitx() - split str along re and return num'th element
@@ -1676,12 +1968,13 @@ function concatarray(a,b,c) {
 #   Example:
 #      print splitx("a:b:c:d", "[:]", 3) ==> "c"
 #
-function splitx(str, re, num,    a){
-    if(split(str, a, re))
+function splitx(str, re, num,    a) {
+    # split() returns the number of fields created. Ensure num is within bounds.
+    if (split(str, a, re) >= num)
         return a[num] 
-    else               
-        return ""
-}                   
+    
+    return ""
+}
 
 #               
 # removefile2() - delete a file/directory
@@ -1695,37 +1988,42 @@ function removefile2(str) {
 
     if (str ~ /[*|?]/ || empty(str)) 
         return 0
-    system("") # Flush buffer
+
     if (exists2(str)) {
-      sys2var("rm -r -- " shquote(str) )
-      system("")
-      if (! exists2(str)) 
-        return 1
+        system("") # Flush buffer before OS handoff
+        system("rm -rf -- " shquote(str) " >/dev/null 2>&1")
+        
+        if (! exists2(str)) 
+            return 1
     }
+    
     return 0
 }
 
 #
-# exists2() - check for file existence                              
+# exists2() - check for file existence                               
 #
 #   . return 1 if exists, 0 otherwise.
 #   . no dependencies version
 #
 function exists2(file    ,line, msg) {
 
+    # Prevent fatal gawk crash on null string evaluation
+    if (file == "") 
+        return 0
+
     if ((getline line < file) == -1 ) {
         msg = (ERRNO ~ /Permission denied/ || ERRNO ~ /a directory/) ? 1 : 0
         close(file)
         return msg
     }
-    else {
-        close(file)
-        return 1
-    }
+    
+    close(file)
+    return 1
 }
 
 #           
-# empty() - return 0 if string is 0-length      
+# empty() - return 1 if string is 0-length      
 #
 function empty(s) {                 
     if (length(s) == 0)  
@@ -1742,55 +2040,42 @@ function empty(s) {
 #     print shquote("Hello' There")    produces 'Hello'\'' There'
 #     echo 'Hello'\'' There'           produces Hello' There
 #
-function shquote(str,  safe) {      
-    safe = str                      
-    gsub(/'/, "'\\''", safe)          
-    gsub(/’/, "'\\’'", safe)
-    return "'" safe "'"                 
+function shquote(str) {      
+    gsub(/'/, "'\\''", str)          
+    gsub(/’/, "'\\’'", str)
+    return "'" str "'"                  
 }
 
 #   
 # convertxml() - convert XML to plain
 #
-function convertxml(str,   safe) {  
-    safe = str                      
-    gsub(/&lt;/,"<",safe)             
-    gsub(/&gt;/,">",safe)
-    gsub(/&quot;/,"\"",safe)            
-    gsub(/&amp;/,"\\&",safe)
-    gsub(/&#039;/,"'",safe)
-    gsub(/&#10;/,"'",safe)
-    return safe
+function convertxml(str) {  
+    gsub(/&lt;/, "<", str)              
+    gsub(/&gt;/, ">", str)
+    gsub(/&quot;/, "\"", str)            
+    gsub(/&#039;/, "'", str)
+    gsub(/&#10;/, "\n", str)  
+    gsub(/&amp;/, "\\&", str) # Must remain last
+    return str
 }
+
 
 # 
 # strip() - strip leading/trailing whitespace
 #   
-#   . faster than the gsub() or gensub() methods eg.
-#        gsub(/^[[:space:]]+|[[:space:]]+$/,"",s)
-#        gensub(/^[[:space:]]+|[[:space:]]+$/,"","g",s)
-#
-#   Credit: https://github.com/dubiousjim/awkenough by Jim Pryor 2012
-#
-function strip(str) {               
-    if (match(str, /[^ \t\n].*[^ \t\n]/))      
-        return substr(str, RSTART, RLENGTH)
-    else if (match(str, /[^ \t\n]/))
-        return substr(str, RSTART, 1)
-    else
-        return ""      
+function strip(str) {                
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", str)
+    return str
 }
 
 #   
 # join() - merge an array of strings into a single string. Array indice are numbers.
 # 
-#   Credit: /usr/local/share/awk/join.awk by Arnold Robbins 1999
-# 
 function join(arr, start, end, sep,    result, i) {    
-    if (length(arr) == 0)
+    if (start > end)
         return ""
 
-    result = arr[start]           
+    result = arr[start]            
 
     for (i = start + 1; i <= end; i++)
         result = result sep arr[i]
@@ -1799,32 +2084,39 @@ function join(arr, start, end, sep,    result, i) {
 }
 
 #
-# join2() - merge an array of strings into a single string. Array indice are strings.
-#                  
+# join2() - merge an array of strings into a single string. Array indices are strings.
+#
 #   . optional third argument 'sortkey' informs how to sort:
 #       https://www.gnu.org/software/gawk/manual/html_node/Controlling-Scanning.html
-#   . spliti() does reverse
+#   . spliti() does reverse 
 #
-function join2(arr, sep, sortkey,         i,lobster,result) {
+function join2(arr, sep, sortkey,         i, lobster, result, save_sorted, has_saved) {
 
+    # 1. Apply local sort if requested
     if (!empty(sortkey)) {
-        if ("sorted_in" in PROCINFO)
+        if ("sorted_in" in PROCINFO) {
             save_sorted = PROCINFO["sorted_in"]
+            has_saved = 1
+        }
         PROCINFO["sorted_in"] = sortkey
     }
 
-    for ( lobster in arr ) {
+    # 2. Join the associative array keys
+    for (lobster in arr) {
         if (++i == 1) {
             result = lobster
             continue
-         }
-         result = result sep lobster
+        }
+        result = result sep lobster
     }
 
-    if (save_sorted)
-        PROCINFO["sorted_in"] = save_sorted
-    else
-        PROCINFO["sorted_in"] = ""
+    # 3. Safely restore global sort state
+    if (!empty(sortkey)) {
+        if (has_saved)
+            PROCINFO["sorted_in"] = save_sorted
+        else
+            delete PROCINFO["sorted_in"]
+    }
 
     return result
 }
@@ -1841,7 +2133,7 @@ function join2(arr, sep, sortkey,         i,lobster,result) {
 function subs(pat, rep, str,    len, i) {
 
     if (!length(str))
-        return
+        return str
 
     # get the length of pat, in order to know how much of the string to remove
     if (!(len = length(pat)))
@@ -1861,72 +2153,84 @@ function subs(pat, rep, str,    len, i) {
 #   . see also subs() and gsubs()
 #       
 #   Credit: https://github.com/e36freak/awk-libs (Daniel Mills)
-#              
+#               
 function splits(str, arr, sep,    len, slen, i) {
 
     delete arr
+    
+    # Fast-fail to mimic native split() behavior
+    if (str == "")
+        return 0
 
-  # if "sep" is empty, just do a normal split
+    # if "sep" is empty, just do a normal split
     if (!(slen = length(sep))) {         
         return split(str, arr, "")
     }
 
-  # loop while "sep" is matched
+    # loop while "sep" is matched
     while (i = index(str, sep)) {
         # append field to array
         arr[++len] = substr(str, 1, i - 1)
         # remove that portion (with the sep) from the string
         str = substr(str, i + slen)
     }
+    
     arr[++len] = str
     return len
 }
 
-
 #
-# asplit() - given a string of "key=value SEP key=value" pairs, break it into array[key]=value
+# asplit() - break "key=val SEP key=val" strings into array[key]=value
 #
 #   . can optionally supply "re" for equals, space; if they're the same or equals is "", array will be setlike
 #
-#   Example             
+#   Example              
 #     asplit(arr, "action=query&format=json&meta=tokens", "=", "&")
 #       arr["action"] = "query"
 #       arr["format"] = "json"
 #       arr["meta"]   = "tokens"
 # 
-#   . join() does the inverse eg. join(arr, 0, length(arr) - 1, "&") == "action=query&format=json&meta=tokens"
-# 
 # Credit: https://github.com/dubiousjim/awkenough
 # 
-function asplit(array, str, equals, space, aux, i, n) {
+function asplit(array, str, equals, space,     aux, i, n) {
 
     n = split(str, aux, (space == "") ? "[ \n]+" : space)
+    
     if (space && equals == space)
         equals = ""               
     else if (!length(equals))             
         equals = "="
+        
     delete array 
+    
     for (i = 1; i <= n; i++) {
         if (equals && match(aux[i], equals))
             array[substr(aux[i], 1, RSTART-1)] = substr(aux[i], RSTART+RLENGTH)
         else
-            array[aux[i]]
+            array[aux[i]] = "" # FIX: Explicitly assign the empty value
     }              
+    
     delete aux     
     return n
-}                    
+}
 
 #
-# readfile2() - similar to readfile but no trailing \n               
+# readfile2() - similar to readfile but no trailing \n                
 #
 #   Credit: https://github.com/dubiousjim/awkenough getfile()
 #
-function readfile2(path,   v, p, res) {
+function readfile2(path,    v, p, res) {
+    
+    # Prevent fatal gawk crash
+    if (path == "") 
+        return ""
+
     res = p = ""
-    while (0 < (getline v < path)) {
+    while ((getline v < path) > 0) {
         res = res p v
         p = "\n"
     }        
+    
     close(path)
     return res
 }
@@ -1942,7 +2246,7 @@ function readfile2(path,   v, p, res) {
 #  . if type == d create a directory
 #  . if type == u return the name but create nothing
 #
-#  Example:                         
+#  Example:                          
 #     outfile = mktemp(meta "index.XXXXXX", "u")
 #
 #  Credit: https://github.com/e36freak/awk-libs   
@@ -1951,8 +2255,8 @@ function mktemp(template, type,
                 c, chars, len, dir, dir_esc, rstring, i, out, out_esc, umask,
                 cmd) {
 
-  # portable filename characters
-    c = "012345689ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  # portable filename characters (added missing 7)
+    c = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     len = split(c, chars, "")
 
   # make sure template is valid
@@ -1993,10 +2297,15 @@ function mktemp(template, type,
         return -1
     }
 
-  # get the base of the template, sans Xs
-    template = substr(template, 0, length(template) - 6)
+  # get the base of the template, sans Xs (1-indexed for strict POSIX compliance)
+    template = substr(template, 1, length(template) - 6)
 
   # generate the filename
+    if (!_MKTEMP_SEEDED) {
+        srand()
+        _MKTEMP_SEEDED = 1
+    }
+    
     do {
         rstring = ""
         for (i=0; i<6; i++) {
@@ -2025,41 +2334,33 @@ function mktemp(template, type,
 #   Example:
 #      "1234" == 1 / "0fr123" == 0 / 1.1 == 0 / -1 == 0 / 0 == 1
 # 
-function isanumber(str,    safe,i) {
-
-    if (length(str) == 0) return 0
-    safe = str
-    while ( i++ < length(safe) ) {
-        if ( substr(safe,i,1) !~ /[0-9]/ )
-            return 0
-    }            
-    return 1
+function isanumber(str) {
+    return (str ~ /^[0-9]+$/) ? 1 : 0
 }
 
 #  
 # randomnumber() - return a random number between 1 to max
 #
 #  . robust awk random number generator works at nano-second speed and parallel simultaneous invocation
-#  . requires global variable _cliff_seed ie:
-#        _cliff_seed = "0.00" splitx(sprintf("%f", systime() * 0.000001), ".", 2)
+#  . requires global variable _cliff_seed 
 #    should be defined one-time only eg. in the BEGIN{} section
 #
-function randomnumber(max, i,randomArr) {
+function randomnumber(max,    i, randomArr) {
 
-  # if missing _cliff_seed fallback to less-robust rand() method
-    if (empty(_cliff_seed))
+  # missing _cliff_seed fallback to less-robust rand() method
+    if (empty(_cliff_seed)) 
         return randomnumber1(max)
-
-  # create array of 1000 random numbers made by cliff_rand() method seeded by systime()                
-    for (i = 0; i <= 1002; i++)
-        randomArr[i] = randomnumber2(max)  
-
-  # choose one at random using rand() method seeded by PROCINFO["pid"]
-    return randomArr[randomnumber1(1000)]
-
-}                           
+    
+  # create array of 1000 random numbers made by cliff_rand() method
+    for (i = 0; i <= 1002; i++) 
+        randomArr[i] = randomnumber2(max)
+ 
+  # choose one at random using native rand()
+    return randomArr[randomnumber1(1000)] 
+ 
+}
 function randomnumber1(max) {
-    srand(PROCINFO["pid"])
+    # Relies on the global srand() set in the BEGIN block
     return int( rand() * max)
 }
 function randomnumber2(max) {
@@ -2079,16 +2380,31 @@ function cliff_rand() {
 }
 
 #                 
-# stdErr() - print s to /dev/stderr
+# stdErr() - print s to target destination
 #
 #  . if flag = "n" no newline
-#  
+#  . routes to stderr, stdout, or appends to a file based on G["debug_dest"]
+# 
 function stdErr(s, flag) {
-    if (flag == "n")
-        printf("%s",s) > "/dev/stderr"
-    else
-        printf("%s\n",s) > "/dev/stderr"
-    close("/dev/stderr")
+    if (G["debug_dest"] == "stderr" || empty(G["debug_dest"])) {
+        if (flag == "n")
+            printf("%s",s) > "/dev/stderr"
+        else
+            printf("%s\n",s) > "/dev/stderr"
+    } 
+    else if (G["debug_dest"] == "stdout") {
+        if (flag == "n")
+            printf("%s",s) > "/dev/stdout"
+        else
+            printf("%s\n",s) > "/dev/stdout"
+    }
+    else {
+        if (flag == "n")
+            printf("%s",s) >> G["debug_dest"]
+        else
+            printf("%s\n",s) >> G["debug_dest"]
+        close(G["debug_dest"])
+    }
 }
 
 # [[ ________ JSON ___________________________________________________________ ]]
@@ -2461,7 +2777,7 @@ function setupEdit(   cookiejar) {
 
   # Where to store cookies
 
-    cookiejar = "/tmp/cookiejar"
+    cookiejar = "/tmp/cookiejar_" PROCINFO["pid"]
     cookieopt = " --save-cookies=\"" cookiejar "\" --load-cookies=\"" cookiejar "\""
 
   # Initialize random number generator
@@ -2486,7 +2802,7 @@ function setupEdit(   cookiejar) {
 
 }
 
-function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,outfile,text) {
+function editPage(title,summary,page,    sp,jsona,data,command,postfile,errfile,fp,line,outfile,text) {
 
     if (page == "STDIN") {
         while ( (getline line < "/dev/stdin") > 0) 
@@ -2501,13 +2817,20 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
     text = urlencodeawk(readfile2(page), "rawphp")
     if (empty(text)) {
       print "No change (empty text)"
+      if (outfile) removefile2(outfile)
       exit
     }
 
     data = strip("action=edit&bot=&format=json&text=" text "&title=" urlencodeawk(title, "rawphp") "&summary=" urlencodeawk(summary, "rawphp") "&token=" urlencodeawk(getEditToken()) )
     postfile = genPostfile(data)
-    command = "wget --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429 --user-agent=" shquote(G["agent"]) " " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"])
+    errfile = mktemp("wgeterr.XXXXXX", "f")
+    command = apiurlPost(data, postfile, errfile)
     sp = sys2var(command)
+    if (length(sp) == 0) {
+        sp = readfile2(errfile)
+    }
+    removefile2(errfile)
+    removefile2(cookiejar)
 
     # Sometimes when sending large files or when the Wikimedia servers are very busy, sp will come back blank even though the edit went through. 
     #  Your calling application should be prepared for getting a blank result string and try again. 
@@ -2531,31 +2854,37 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,fp,line,
 
 }
 
-function getEditToken(  sp,jsona,command,data) {
+function getEditToken(  sp,jsona,command,data,i) {
 
     setupEdit()
     data = "action=query&format=json&meta=tokens"
-    sp = sys2var(apiurl(data))
-    query_json(sp, jsona)
+    command = apiurl(data)
 
-    if (G["debug"] ) {
-        print "\nGET TOKEN\n-------"
-        print command
-        print "  ---JSON---"
-        awkenough_dump(jsona, "jsona")
-        print "  ---RAW---"
-        print sp
+    for (i = 1; i <= 3; i++) {
+        sp = sys2var(command)
+        query_json(sp, jsona)
+        
+        if (!empty(jsona["query","tokens","csrftoken"])) {
+            return jsona["query","tokens","csrftoken"]
+        }
+        
+        if (G["debug"]) {
+            stdErr("getEditToken: Failed to fetch token. Retrying... (" i "/3)")
+        }
+        system("sleep 5")
     }
 
-    return jsona["query","tokens","csrftoken"]
-
+    stdErr("Fatal: Unable to retrieve edit token from API. Response: " substr(sp, 1, 100))
+    exit 1
 }
 
 function movePage(from,to,reason,    sp,jsona,data,command) {
 
     setupEdit()
     data = strip("action=move&format=json&from=" urlencodeawk(from, "rawphp") "&to=" urlencodeawk(to, "rawphp") "&reason=" urlencodeawk(reason, "rawphp") "&movetalk=&token=" urlencodeawk(getEditToken()) )
-    sp = sys2var(apiurl(data))
+    command = apiurl(data)
+    sp = sys2var(command)
+    removefile2(cookiejar)
 
     if (G["debug"]) {
         print "\nMOVEARTICLE\n------"
@@ -2575,13 +2904,19 @@ function movePage(from,to,reason,    sp,jsona,data,command) {
 # purgePage() - issue a purge on a page title
 #  https://www.mediawiki.org/wiki/API:Purge
 #
-function purgePage(title,    sp,jsona,data,command) {
+function purgePage(title,    sp,jsona,data,command,errfile,postfile) {
 
     setupEdit()
     data = strip("action=purge&titles=" urlencodeawk(title, "rawphp") "&format=json")
     postfile = genPostfile(data)
-    command = "wget --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429 --user-agent=" shquote(G["agent"]) " " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-file=" shquote(postfile) " -q -O- " shquote(G["apiURL"])
+    errfile = mktemp("wgeterr.XXXXXX", "f")
+    command = apiurlPost(data, postfile, errfile)
     sp = sys2var(command)
+    if (length(sp) == 0) {
+        sp = readfile2(errfile)
+    }
+    removefile2(errfile)
+    removefile2(cookiejar)
 
     if (G["debug"]) {
         print "\nPURGEARTICLE\n------"
@@ -2602,6 +2937,70 @@ function purgePage(title,    sp,jsona,data,command) {
 }
 
 #
+# nulleditPage() - issue a null edit on a page title to update category links
+#  https://www.mediawiki.org/wiki/API:Edit
+#
+function nulleditPage(title,    sp,jsona,data,command,postfile,errfile) {
+
+    # prependtext= with no value forces a null edit without needing to fetch the page content
+    data = strip("action=edit&title=" urlencodeawk(title, "rawphp") "&prependtext=&nocreate=1&format=json&token=" urlencodeawk(getEditToken()) )
+    postfile = genPostfile(data)
+    errfile = mktemp("wgeterr.XXXXXX", "f")
+    command = apiurlPost(data, postfile, errfile)
+    sp = sys2var(command)
+    if (length(sp) == 0) {
+        sp = readfile2(errfile)
+    }
+    removefile2(errfile)
+    removefile2(cookiejar)
+
+    if (G["debug"]) {
+        print "\nNULLEDITARTICLE\n------"
+        print command
+        print "   ---JSON---"
+        query_json(sp, jsona)
+        awkenough_dump(jsona, "jsona")
+        print "   ---RAW---"
+        print sp 
+    }
+    if (! G["debug"]) {
+        removefile2(postfile)
+    }
+
+    # Intercept the generic "nochange" JSON payload for better UX
+    query_json(sp, jsona)
+    if (jsona["edit","result"] ~ /[Ss]uccess/) {
+        print "Null edit success: " title
+    } else {
+        printResult(sp) # Fallback to standard error printing
+    }
+
+}
+
+# ___ Raw API URL (-U) 
+
+#
+# Send a raw, custom request directly to the authenticated fetcher
+#
+function rawAPI(url,   results) {
+
+        # If it's not a full HTTP link, assume it's a query string and prepend the base API URL
+        if (url !~ /^https?:\/\//) {
+            # Strip leading ? or & just in case the user typed it
+            sub(/^[?&]/, "", url)
+            url = G["apiURL"] url
+        }
+
+        # Fetch using the hardened, OAuth-aware engine
+        results = http2var(url)
+
+        if (!empty(results))
+            print results
+        else
+            stdErr("No response or fatal HTTP error.")
+}
+
+#
 # userInfo() - user info via API
 #  https://www.mediawiki.org/wiki/API:userinfo
 #
@@ -2609,15 +3008,31 @@ function userInfo(  sp,jsona,command,data) {
 
     setupEdit()
     data = "action=query&meta=userinfo&uiprop=" urlencodeawk("rights|groups|blockinfo") "&format=json"
-    sp = sys2var(apiurl(data))
-    query_json(sp, jsona)
-    awkenough_dump(jsona, "jsona")
+    command = apiurl(data)
+    sp = sys2var(command)
+    removefile2(cookiejar)
+    
+    if (G["debug"]) {
+        print "\nUSERINFO\n------"
+        print command
+        print "   ---JSON---"
+        query_json(sp, jsona)
+        awkenough_dump(jsona, "jsona")
+        print "   ---RAW---"
+        print sp 
+    } else {
+        # Print the raw JSON payload to stdout for normal CLI usage
+        if (!empty(sp))
+            print sp
+        else
+            stdErr("No response or HTTP error.")
+    }
 }
 
 #
 # printResult() - print result of action
 #
-function printResult(json,  jsona,nc,sc) {
+function printResult(json,  jsona,nc,sc,arr) {
 
     query_json(json, jsona)
 
@@ -2639,12 +3054,27 @@ function printResult(json,  jsona,nc,sc) {
         print jsona["edit","spamblacklist"]
       else if( !empty(jsona["move","from"]) && !empty(jsona["move","to"]) )
         print "Page moved from " shquote(jsona["move","from"]) " -> " shquote(jsona["move","to"])
-      else if( !empty(jsona["purge","1","title"]) && empty(jsona["purge","1","missing"]) )
-        print "Page purged: " jsona["purge","1","title"]
-      else
-        print "Unknown error"
+      else if( match(json, /"purged"/) && match(json, /"title":"([^"]+)"/, arr) )
+        print "Page purged: " arr[1]
+      else {
+        # --- Raw Payload & HTTP Status Inspection ---
+        if (length(json) == 0) {
+            print "Empty response from Wikipedia (Possible dropped connection)"
+        } else if (match(json, /ERROR ([0-9]{3}):? ([^\n]*)/, arr)) {
+            print "HTTP Error: " arr[1] " - " arr[2]
+        } else if (json ~ /<html/ || json ~ /<!DOCTYPE/ || json ~ /<title>/) {
+            if (match(json, /<title>([^<]*)<\/title>/, arr)) {
+                print "HTTP Error: " arr[1]
+            } else {
+                print "HTTP Error: Received HTML instead of JSON. Server likely overloaded."
+            }
+        } else {
+            print "Unknown error. Raw response snippet: " substr(json, 1, 100)
+        }
+      }
     }
 }
+        
 
 #
 # genPostfile() - generate postfile wget
@@ -2660,9 +3090,50 @@ function genPostfile(data,  outfile) {
 #
 # apiurl() - build a URL to the API using given post data 
 #
-function apiurl(data,  command,wget_opts) {
+function apiurl(data,  command, auth_header, header_cmd, final_url) {
 
-    command = "wget --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429 --user-agent=" shquote(G["agent"]) " " cookieopt " --header=" shquote("Content-Type: application/x-www-form-urlencoded") " --header=" shquote(strip(oauthHeader(data))) " --post-data=" shquote(data) " -q -O- " shquote(G["apiURL"])
+    auth_header = strip(oauthHeader(data))
+    header_cmd = " --header=" shquote("Content-Type: application/x-www-form-urlencoded")
+
+    # Route through custom tfproxy proxy if enabled
+    if (G["tfproxy"] == 1 && G["tfproxy_pass"] != "") {
+        final_url = G["tfproxy_url"] urlencodeawk(G["apiURL"])
+        gsub(/^Authorization: /, "X-WMF-OAuth: ", auth_header)
+        header_cmd = header_cmd " --header=" shquote(G["tfproxy_header"] ": " G["tfproxy_pass"])
+    } else {
+        final_url = G["apiURL"]
+    }
+
+    header_cmd = header_cmd " --header=" shquote(auth_header)
+
+    command = G["timeout"] " wget --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429,502,503,504 --user-agent=" shquote(G["agent"]) " " cookieopt header_cmd " --post-data=" shquote(data) " -q -O- " shquote(final_url)
+    
+    if (G["debug"])
+        stdErr(command)
+    return command
+}
+
+#
+# apiurlPost() - build a URL to the API using a file for post data 
+#
+function apiurlPost(data, postfile, errfile,  command, auth_header, header_cmd, final_url) {
+
+    auth_header = strip(oauthHeader(data))
+    header_cmd = " --header=" shquote("Content-Type: application/x-www-form-urlencoded")
+
+    # Route through custom tfproxy proxy if enabled
+    if (G["tfproxy"] == 1 && G["tfproxy_pass"] != "") {
+        final_url = G["tfproxy_url"] urlencodeawk(G["apiURL"])
+        gsub(/^Authorization: /, "X-WMF-OAuth: ", auth_header)
+        header_cmd = header_cmd " --header=" shquote(G["tfproxy_header"] ": " G["tfproxy_pass"])
+    } else {
+        final_url = G["apiURL"]
+    }
+
+    header_cmd = header_cmd " --header=" shquote(auth_header)
+
+    command = G["timeout"] " wget --tries=3 --timeout=120 --waitretry=60 --retry-connrefused --retry-on-http-error=429,502,503,504 --user-agent=" shquote(G["agent"]) " " cookieopt header_cmd " --post-file=" shquote(postfile) " -q -O- " shquote(final_url) " 2> " shquote(errfile)
+    
     if (G["debug"])
         stdErr(command)
     return command
@@ -2679,41 +3150,59 @@ function oauthHeader(data,   sp) {
     return sp
 }
 
-#
 # MWOAuthGenerateHeader() - MediaWiki Generate OAuth Header
 #
 #   . requires openssl
 #
-#   Credit: translation of PhP script https://www.mediawiki.org/wiki/OAuth/Owner-only_consumers#Algorithm
-#
-function MWOAuthGenerateHeader(consumerKey, consumerSecret, accessKey, accessSecret, url, method, data,  
+function MWOAuthGenerateHeader(consumerKey, consumerSecret, accessKey, accessSecret, url, method, data,
 
-                               nonce,headerParams,dataArr,allParams,allParamsJoined,k,i,j,url2,
-                               signatureBaseParts,signatureBaseString,hmac,header,save_sorted) {
+                               nonce,headerParams,dataArr,allParamsJoined,k,i,j,url2,
+                               signatureBaseParts,signatureBaseString,cmd,header,save_sorted,
+                               decodedDataArr) {
 
   # sort associative arrays by index string ascending
     if ("sorted_in" in PROCINFO)               
         save_sorted = PROCINFO["sorted_in"]
     PROCINFO["sorted_in"] = "@ind_str_asc"
 
-    nonce = strip(splitx(sys2varPipe(systime() randomnumber(1000000), "openssl md5"), "= ", 2))
+  # Generate 32 characters of pure cryptographic randomness - guaranteed never to collide
+    nonce = strip(sys2var("openssl rand -hex 16"))
 
     asplit(headerParams, "oauth_consumer_key=" consumerKey " oauth_token=" accessKey " oauth_signature_method=HMAC-SHA1 oauth_timestamp=" systime() " oauth_nonce=" nonce " oauth_version=1.0") 
+
+  # 1. Parse the incoming query parameters
     asplit(dataArr, data, "=", "&")
-    concatarray(headerParams,dataArr,allParams)
-    for (k in allParams) 
-        allParamsJoined[i++] = k "=" allParams[k]
+
+  # 2. Decode then strictly re-encode the query params (normalizes %2D to -, %20 to %20, etc.)
+    for (k in dataArr) {
+        decodedDataArr[urlencodeawk(urldecodeawk(k), "rawphp")] = urlencodeawk(urldecodeawk(dataArr[k]), "rawphp")
+    }
+
+  # 3. Strictly encode the OAuth header params and add them to the signature pool
+    for (k in headerParams) {
+        decodedDataArr[urlencodeawk(k, "rawphp")] = urlencodeawk(headerParams[k], "rawphp")
+    }
+
+  # 4. Build the sorted parameter string
+    for (k in decodedDataArr) 
+        allParamsJoined[i++] = k "=" decodedDataArr[k]
 
     url2 = urlElement(url, "scheme") "://" tolower(urlElement(url, "netloc")) urlElement(url, "path")
-    asplit(signatureBaseParts, "0=" toupper(method) " 1=" url " 2=" join(allParamsJoined, 0, length(allParamsJoined) - 1, "&"))
+
+  # 5. Build Signature Base String
+    signatureBaseParts[0] = toupper(method)
+    signatureBaseParts[1] = url2
+    signatureBaseParts[2] = join(allParamsJoined, 0, length(allParamsJoined) - 1, "&")
+
     signatureBaseString = urlencodeawk(signatureBaseParts[0], "rawphp") "&" urlencodeawk(signatureBaseParts[1], "rawphp") "&" urlencodeawk(signatureBaseParts[2], "rawphp")
 
   # Generate HMAC binary and pipe directly to base64 in the shell
     cmd = "openssl sha1 -hmac " shquote(urlencodeawk(consumerSecret, "rawphp") "&" urlencodeawk(accessSecret, "rawphp")) " -binary | openssl base64"
     headerParams["oauth_signature"] = strip(sys2varPipe(signatureBaseString, cmd))
 
+  # Build final Authorization header
     for (k in headerParams) 
-        header[j++] = urlencodeawk(k, "rawphp") "=" urlencodeawk(headerParams[k], "rawphp")
+        header[j++] = urlencodeawk(k, "rawphp") "=\"" urlencodeawk(headerParams[k], "rawphp") "\""
 
     if (save_sorted)
         PROCINFO["sorted_in"] = save_sorted
@@ -2722,4 +3211,3 @@ function MWOAuthGenerateHeader(consumerKey, consumerSecret, accessKey, accessSec
 
     return sprintf("%s", "Authorization: OAuth " join(header, 0, length(header) - 1, ", "))
 }
-
