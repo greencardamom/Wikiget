@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.50 \
+                 version   = 1.51 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -1217,7 +1217,7 @@ function getbacklinks(url, entity, method,      jsonin, jsonout, continuecode) {
 #
 function wikitextplain(namewiki,    command,f,target_title,xmlin,c,b,k) {
 
-        command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki)) "&action=raw"
+        command = "https://" G["lang"] "." G["project"] ".org/w/index.php?title=" urlencodeawk(strip(namewiki), "uri") "&action=raw"
         f = http2var(command)
         if (empty(f)) 
             return ""
@@ -1638,6 +1638,8 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
         if(url ~ "([.]|/)wiki")
             tries = 20
 
+        force_post = 0  # force POST in proxy API if initial GET fails
+
         for(i = 1; i <= tries; i++) {
             
             # Dynamic maxlag escalation
@@ -1649,17 +1651,33 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
             headerCmd = ""
             wait = 0
 
+            # --- PARSE AND AUTO-POST LONG URLS ---
+            is_post = 0
+            post_data = ""
+            method = "GET"
+
+            if (index(current_url, "?") > 0) {
+                baseUrl = substr(current_url, 1, index(current_url, "?") - 1)
+                queryStr = substr(current_url, index(current_url, "?") + 1)
+            } else {
+                baseUrl = current_url
+                queryStr = ""
+            }
+
+            # Convert to POST if the URL is massive OR if a previous GET failed
+            if ((force_post == 1 || length(current_url) > 2000) && queryStr != "") {
+                is_post = 1
+                method = "POST"
+                post_data = queryStr
+                current_url = baseUrl # Strip query string so it isn't appended to the proxy target
+            }
+
             # --- OAUTH & HEADER BUILDER ---
             if (G["oauth_read"] == 1 && current_url ~ /api\.php/ && !empty(G["consumerKey"]) && !empty(G["accessKey"]) && G["wta"] != "lynx") {
-                if (index(current_url, "?") > 0) {
-                    baseUrl = substr(current_url, 1, index(current_url, "?") - 1)
-                    queryStr = substr(current_url, index(current_url, "?") + 1)
-                } else {
-                    baseUrl = current_url
-                    queryStr = ""
-                }
                 
-                authHeader = MWOAuthGenerateHeader(G["consumerKey"], G["consumerSecret"], G["accessKey"], G["accessSecret"], baseUrl, "GET", queryStr)
+                # Pass the correct payload and HTTP method for OAuth signing
+                auth_payload = is_post ? post_data : queryStr
+                authHeader = MWOAuthGenerateHeader(G["consumerKey"], G["consumerSecret"], G["accessKey"], G["accessSecret"], baseUrl, method, auth_payload)
                 
                 if (!empty(authHeader)) {
                     # If proxy is active, repackage the OAuth header
@@ -1673,8 +1691,7 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                         headerCmd = " -H " shquote(strip(authHeader)) " "
                     }
                 }
-            } 
-
+            }
 
             # --- INJECT PROXY AUTH HEADER ---
             # Only inject the password header if the proxy toggle is ON
@@ -1711,51 +1728,57 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
             }
 
             # --- EXECUTION ---
-            if (G["wta"] == "wget")
-                op = sys2var(G["timeout"] " wget " local_opts headerCmd " -q -O- -- " shquote(final_url) )  
-            else if (G["wta"] == "curl")
-                op = sys2var(G["timeout"] " curl --max-time 120 -L -s -k --user-agent " shquote(G["agent"]) " " headerCmd " -- " shquote(final_url) )  
-            else if (G["wta"] == "lynx")
+            if (G["wta"] == "wget") {
+                post_cmd = is_post ? " --post-data=" shquote(post_data) " " : " "
+                op = sys2var(G["timeout"] " wget " local_opts " --content-on-error " headerCmd post_cmd " -q -O- -- " shquote(final_url) )  
+            } else if (G["wta"] == "curl") {
+                post_cmd = is_post ? " -d " shquote(post_data) " " : " "
+                op = sys2var(G["timeout"] " curl --max-time 120 -L -s -k --user-agent " shquote(G["agent"]) " " headerCmd post_cmd "-- " shquote(final_url) )  
+            } else if (G["wta"] == "lynx") {
                 op = sys2var("lynx -source -- " shquote(final_url) )  
+            }
             
             # --- VALIDATION & BACKOFF ---
             if (!empty(op)) {
                 if (op ~ /"error"[^}]*"code"[: \t]+"[^"]*"/) {
                     if (op ~ /"maxlag"/ || op ~ /"ratelimited"/) {
-                        if(i > 1 || G["debug"])
+                        if(G["debug"])
                           stdErr("http2var: [WARNING] API Overload or Rate Limit (Attempt " i ").")
                         wait = 15 + (i * 10) 
                     } else if (op ~ /"mwoauth-/) {
-                        if(i > 1 || G["debug"])
+                        if(G["debug"])
                           stdErr("http2var: [WARNING] Transient OAuth Drop (Attempt " i ")" final_url)
                         wait = 10 + (i * 5) 
                     } else {
-                        if(i > 1 || G["debug"])
+                        if(G["debug"])
                           stdErr("http2var: [FATAL API ERROR] " substr(op, 1, 300))
                         return op 
                     }
                 }
                 else if (tolower(op) ~ /^[ \t\n]*(<!doctype html|<html)/) {
-                     if(i > 1 || G["debug"])
+                     if(G["debug"])
                        stdErr("http2var: [WARNING] WMF Varnish HTML Gateway Error (Attempt " i ").")
                      wait = 15 + (i * 5) 
+                     force_post = 1
                 } 
                 else if (url ~ /format=json/ && op !~ /}[ \t\n]*$/) {
-                     if(i > 1 || G["debug"])
+                     if(G["debug"])
                        stdErr("http2var: [WARNING] Truncated Payload or Gateway Drop (Attempt " i ").")
                      wait = 15 + (i * 10)
+                     force_post = 1
                 }
                 else {
                     return op 
                 }
             } else {
-                if(i > 1 || G["debug"])
+                if(G["debug"])
                   stdErr("http2var: [WARNING] Network Timeout or Empty Response (Attempt " i ").")
                 wait = 15 + (i * 10)
+                force_post = 1
             }
             
             if (i < tries && wait > 0) {
-                if(i > 1 || G["debug"])
+                if(G["debug"])
                   stdErr("http2var: Retrying in " wait "s... " substr(op, 1, 100))
                 system("sleep " wait)
             }
@@ -1768,6 +1791,8 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
         
         return ""
 }
+
+
 
 
 
@@ -1891,7 +1916,7 @@ function urlElement(url, element,    a, scheme, netloc, path, query, fragment) {
 #
 # urldecodeawk - natively decode percent-encoded strings
 #
-function urldecodeawk(str,  c, len, res, i, hex) {
+function urldecodeawk(str, class,  c, len, res, i, hex) {
     res = ""
     len = length(str)
     for (i = 1; i <= len; i++) {
@@ -1903,7 +1928,7 @@ function urldecodeawk(str,  c, len, res, i, hex) {
                 i += 2
                 continue
             }
-        } else if (c == "+") {
+        } else if (c == "+" && class != "uri") {
             res = res " "
             continue
         }
@@ -2552,13 +2577,18 @@ function parse_json(str, T, V,  slack,    c,s,n,a,A,b,B,C,U,W,i,j,k,u,v,w,root) 
                     if (u == "") {
                        if (++k % 2 == 1) v = v "\\"
                     } else {
-                        w = substr(u, 1, 1)  
-                        if (w == "b") v = v "\b" substr(u, 2)
-                        else if (w == "f") v = v "\f" substr(u, 2)
-                        else if (w == "n") v = v "\n" substr(u, 2)
-                        else if (w == "r") v = v "\r" substr(u, 2)
-                        else if (w == "t") v = v "\t" substr(u, 2)
-                        else v = v u
+                        if (k % 2 == 1) {
+                            v = v u
+                        } else {
+                            w = substr(u, 1, 1)  
+                            if (w == "b") v = v "\b" substr(u, 2)
+                            else if (w == "f") v = v "\f" substr(u, 2)
+                            else if (w == "n") v = v "\n" substr(u, 2)
+                            else if (w == "r") v = v "\r" substr(u, 2)
+                            else if (w == "t") v = v "\t" substr(u, 2)
+                            else v = v u
+                        }
+                        k = 0
                     }
                 }
             }

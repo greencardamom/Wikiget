@@ -1,28 +1,30 @@
-# Changes in reverse chronological order
+# Changes
 #
-# 1.50 May 15      - see RELEASE-NOTES.1.50 for details
+# 1.51 May 21      - fix rare bug in JSON code 
+# 1.50 May 15      - MAJOR RELEASE. See RELEASE-NOTES.1.50 for details
 # 1.35 Mar 23      - fix a 1 in 256 intermittent problem in MWOAuthGenerateHeader() causing 
 #                    OAuth "Invalid signature" error.
 # 1.35 Mar 22      - remove stray &bot from movePage() API command
-# 1.34 Mar 19      - improve wget options in editPage() purgePage() apiurl()
+# 1.34 Mar 19  ↑   - improve wget options in editPage() purgePage() apiurl()
 # 1.32 Feb 11 2026 - improve default agent string again
 #                    add G["wget_opts"] to lessen chance of timeouts/429 with WMF API
 #                    add G["emailfp"] in setup 
 # 1.30 Aug 17      - MAJOR BUG: Agent string was not correctly defined. This caused API calls
 #                    to fail or partly. Ensure the G["agent"] string is correctly defined
-#                    with your contact information. See near the top of the program.
+#              ↑     with your contact information. See near the top of the program.
 # 1.22 Jul 08 2025 - improve memory management in getallpages()
+#              ↑
 # 1.21 Dec 06 2024 - fix regex statements generating warnings under newer awk versions
-#                  - add secure location to store OAuth secrets
+#              ↑   - add secure location to store OAuth secrets
 # 1.20 Dec 16 2023 - minor changes 
-# 1.19 Dec 19      - add -G page purge for mass purges
+# 1.19 Dec 19  ↑   - add -G page purge for mass purges
 # 1.18 May 29 2021 - fix bug in -n with multiple namespaces
 # 1.17 Oct 31      - add -i and -j option for use with -r 
-# 1.16 Jun 30      - fix bug in join2()
+# 1.16 Jun 30  ↑   - fix bug in join2()
 # 1.15 Apr 08 2020 - add optional -i and -j functions used with -u
 #                  - add random seed
 #                  - fix bug in getcontinue() when page name is "0", "0.0" etc.
-# 1.14 Jun 08      - fix bug in -R (page move)
+# 1.14 Jun 08  ↑   - fix bug in -R (page move)
 # 1.13 Jan 13 2019 - fix bug in -A when -k = 0
 # 1.12 Dec 21      - add -B
 # 1.11 Dec 11      - add -k for -A
@@ -50,14 +52,15 @@
 # 0.72 Mar 15      - add -F forward-links
 # 0.71 Mar 06      - add -z project option
 #                    extended help display changed to ~80 column
-#                    add regex example to help
+#              ↑     add regex example to help
 # 0.70 Feb 21 2018 - add -y debug option
 #                    add -n option when using -b
 #                    help display changed to ~80 column
-# 0.62 Oct 03 2017 - -a max's out at 10000
+# 0.62 Oct 03      - fix -a max's out at 10000
 # 0.61 Apr 14      - fix -r (rccontinue)
-# 0.60 Mar 17      - add -r option
+# 0.60 Mar 17  ↑   - add -r option
 # 0.51 Mar 13 2017 - add -n option when using -x
+#              ↑
 # 0.50 Dec 15 2016 - add -x (external link search)
 # 0.47 Nov 30      - fix &utf8=1 in API for usercontributions and categories
 # 0.46 Nov 30      - fix -g (for +50 results)
@@ -67,6 +70,6 @@
 #                    add apierror() (check for API errors)
 # 0.30 Nov 27      - converted -c and -u to JSON
 # 0.20 Nov 26      - add -t (backlink types)
-#                    add -q (category link types)
+#              ↑     add -q (category link types)
 # 0.10 Nov 24 2016 - initial release
 
