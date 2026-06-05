@@ -527,7 +527,7 @@ function usage(die) {
     print ""
     print " Recent changes:"
     print "       -r               Recent changes (past 30 days) aka Special:RecentChanges" 
-    print "                         Either -o or -t required"
+    print "                         Either -o or -k required"
     print "         -o <username>  Only list changes made by this user"
     print "         -k <tag>       Only list changes tagged with this tag"
     print "         -i <regex>     (option) Edit comment must include regex match"
