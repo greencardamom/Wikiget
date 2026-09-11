@@ -122,7 +122,7 @@ BEGIN { # Program run
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "XOIyrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:R:T:AB:G:N:U:Y:")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "XOIyrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:R:T:AB:G:N:U:Y:M:")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -250,6 +250,8 @@ function parsecommandline(c,opts,Arguments) {
             Arguments["api_url"] = verifyval(Optarg)
             Arguments["main_c"] = "U"
         }
+        if (c == "M")                                 #  -M <method>     HTTP method for -U (GET or POST)
+            Arguments["method"] = verifyval(Optarg)
         if (c == "O")                                 #  -O              Toggle OAuth for read requests
             Arguments["toggle_oauth"] = 1
         if (c == "X")                                 #  -X              Toggle Toolforge proxy
@@ -275,6 +277,20 @@ function parsecommandline(c,opts,Arguments) {
 # processarguments() - process arguments
 #
 function processarguments(Arguments,   c,a,i) {
+
+    if (empty(Arguments["method"]))
+        G["method"] = "GET"
+    else {
+        G["method"] = toupper(Arguments["method"])
+        if (G["method"] !~ /^GET$|^POST$/) {
+            stdErr("wikiget: invalid -M method '" Arguments["method"] "' (expected: GET or POST)")
+            exit
+        }
+        if (Arguments["main_c"] != "U") {
+            stdErr("wikiget: -M requires -U")
+            exit
+        }
+    }
 
     if (Arguments["toggle_oauth"]) {
         if (G["oauth_read"] == 1) G["oauth_read"] = 0
@@ -480,7 +496,10 @@ function processarguments(Arguments,   c,a,i) {
         }
     }
     else if (Arguments["main_c"] == "U") {                     # Raw API URL
-        rawAPI(Arguments["api_url"])
+        if (G["method"] == "POST")
+            rawAPIPost(Arguments["api_url"])
+        else
+            rawAPI(Arguments["api_url"])
     }
     else 
         usage(1)
@@ -581,6 +600,10 @@ function usage(die) {
     print "                         Can be the full URL, or just the query string."
     print "                         Example: wikiget -U \"action=query&meta=siteinfo&format=json\""
     print "                         Note: URL values must be percent-encoded (e.g., %20 for spaces)."
+    print "         -M <method>    (option) GET (default) or POST. POST sends the query as an"
+    print "                         authenticated write, enabling any write action through -U."
+    print "                         A literal token=AUTO is replaced with a fresh CSRF token;"
+    print "                         token=AUTO:rollback fetches a rollback token."
     print ""
     print " Edit page:"
     print "       -E <title>       Edit a page with this title. Requires -S and -P"
@@ -2466,7 +2489,7 @@ function awkenough_die(msg) {
 }
 
 function awkenough_assert(test, msg) {
-    if (!test) awenough_die(msg ? msg : "assertion failed")
+    if (!test) awkenough_die(msg ? msg : "assertion failed")
 }
 
 # unitialized scalar
@@ -2884,18 +2907,24 @@ function editPage(title,summary,page,    sp,jsona,data,command,postfile,errfile,
 
 }
 
-function getEditToken(  sp,jsona,command,data,i) {
+#
+# getEditToken() - fetch an action token. type: "csrf" (default) or "rollback"
+#  https://www.mediawiki.org/wiki/API:Tokens
+#
+function getEditToken(type,   sp,jsona,command,data,i) {
 
     setupEdit()
-    data = "action=query&format=json&meta=tokens"
+    if (empty(type))
+        type = "csrf"
+    data = "action=query&format=json&meta=tokens&type=" urlencodeawk(type)
     command = apiurl(data)
 
     for (i = 1; i <= 3; i++) {
         sp = sys2var(command)
         query_json(sp, jsona)
         
-        if (!empty(jsona["query","tokens","csrftoken"])) {
-            return jsona["query","tokens","csrftoken"]
+        if (!empty(jsona["query","tokens",type "token"])) {
+            return jsona["query","tokens",type "token"]
         }
         
         if (G["debug"]) {
@@ -3028,6 +3057,63 @@ function rawAPI(url,   results) {
             print results
         else
             stdErr("No response or fatal HTTP error.")
+}
+
+#
+# rawAPIPost() - send a raw API request as an authenticated POST (-U with -M POST)
+#
+#   Uses the same POST path as -E/-R/-G/-N (genPostfile + apiurlPost), which OAuth-signs
+#   with method POST. A literal token=AUTO in the query is replaced with a fresh CSRF
+#   token (token=AUTO:rollback for a rollback token) before signing, since the POST body
+#   is part of the signature base string.
+#
+#   Prints the raw response and does not retry: a write returning an empty body may
+#   still have been applied, so the caller should verify rather than re-POST.
+#
+function rawAPIPost(data,   results, postfile, errfile, command, token, ttype) {
+
+    setupEdit()
+
+    if (data ~ /^https?:\/\//)
+        data = urlElement(data, "query")
+    sub(/^[?&]/, "", data)
+
+    if (empty(data)) {
+        stdErr("wikiget: -M POST requires a query string in -U")
+        exit
+    }
+
+    if (data !~ /(^|&)format=/)
+        data = data "&format=json"
+    if (data !~ /(^|&)maxlag=/)
+        data = data "&maxlag=" G["maxlag"]
+
+    if (match(data, /(^|&)token=AUTO(:[a-z]+)?(&|$)/)) {
+        ttype = (data ~ /token=AUTO:rollback/) ? "rollback" : "csrf"
+        token = getEditToken(ttype)
+        sub(/token=AUTO(:[a-z]+)?/, "token=" urlencodeawk(token, "rawphp"), data)
+    }
+
+    postfile = genPostfile(data)
+    errfile = mktemp("wgeterr.XXXXXX", "f")
+    command = apiurlPost(data, postfile, errfile)
+    results = sys2var(command)
+    if (length(results) == 0)
+        results = readfile2(errfile)
+    removefile2(errfile)
+
+    if (G["debug"]) {
+        print "\nRAWAPIPOST\n------"
+        print command
+        print "   ---RAW---"
+    }
+    else
+        removefile2(postfile)
+
+    if (!empty(results))
+        print results
+    else
+        stdErr("No response or fatal HTTP error.")
 }
 
 #
