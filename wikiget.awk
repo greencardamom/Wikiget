@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.51 \
+                 version   = 1.52 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -95,7 +95,7 @@ BEGIN { # Program cfg
     #   chmod 600 mybot.accesskey
     #   chmod 600 mybot.accesssecret
 
-    G["oauth_read"] = 0 # OAuth for read requests (1 = enabled, 0 = disabled)
+    G["oauth_default"] = "off" # Default OAuth mode for read requests: "on" | "off" | "soft". Overridden per-call by -O. (on=OAuth, off=anonymous, soft=OAuth w/ anonymous fallback)
     G["consumerKey"]    = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumerkey"))
     G["consumerSecret"] = strip(readfile("/home/user/.config/wikiget/secrets/mybot.consumersecret"))
     G["accessKey"]      = strip(readfile("/home/user/.config/wikiget/secrets/mybot.accesskey"))
@@ -252,8 +252,16 @@ function parsecommandline(c,opts,Arguments) {
         }
         if (c == "M")                                 #  -M <method>     HTTP method for -U (GET or POST)
             Arguments["method"] = verifyval(Optarg)
-        if (c == "O")                                 #  -O              Toggle OAuth for read requests
-            Arguments["toggle_oauth"] = 1
+        if (c == "O") {                               #  -O [on|off|soft]  OAuth mode for read requests
+            # Argument is optional. Bare -O means the opposite of G["oauth_default"]
+            # (off when the default is on or soft, on when it is off).
+            # An explicit on|off|soft is absolute, never relative to the default.
+            if (ARGV[Optind] == "on" || ARGV[Optind] == "off" || ARGV[Optind] == "soft") {
+                Arguments["oauth_mode"] = ARGV[Optind]
+                Optind++
+            } else
+                Arguments["oauth_mode"] = "toggle"
+        }
         if (c == "X")                                 #  -X              Toggle Toolforge proxy
             Arguments["toggle_tfproxy"] = 1
         if (c == "y")                                 #  -y              Show debugging info to stderr
@@ -276,7 +284,7 @@ function parsecommandline(c,opts,Arguments) {
 #
 # processarguments() - process arguments
 #
-function processarguments(Arguments,   c,a,i) {
+function processarguments(Arguments,   c,a,i,oauth_mode) {
 
     if (empty(Arguments["method"]))
         G["method"] = "GET"
@@ -292,9 +300,15 @@ function processarguments(Arguments,   c,a,i) {
         }
     }
 
-    if (Arguments["toggle_oauth"]) {
-        if (G["oauth_read"] == 1) G["oauth_read"] = 0
-        else G["oauth_read"] = 1
+    oauth_mode = !empty(Arguments["oauth_mode"]) ? Arguments["oauth_mode"] : G["oauth_default"]
+    if (oauth_mode == "toggle")
+        oauth_mode = (G["oauth_default"] == "off") ? "on" : "off"
+    if (oauth_mode == "on")        { G["oauth_read"] = 1; G["oauth_soft"] = 0 }
+    else if (oauth_mode == "off")  { G["oauth_read"] = 0; G["oauth_soft"] = 0 }
+    else if (oauth_mode == "soft") { G["oauth_read"] = 1; G["oauth_soft"] = 1 }
+    else {
+        stdErr("wikiget: invalid OAuth mode '" oauth_mode "' (expected: on, off, or soft)")
+        exit
     }
 
     if (Arguments["toggle_tfproxy"]) {
@@ -625,7 +639,8 @@ function usage(die) {
     print "                         https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects"
     print "       -m <#>           API maxlag value (default: " G["maxlag"] ")"
     print "                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter"
-    print "       -O               Toggle OAuth for read requests (default: " (G["oauth_read"] == 1 ? "ON" : "OFF") ")"
+    print "       -O <on|off|soft> OAuth for read requests: on=force, off=anonymous, soft=OAuth w/ anon fallback. (default: " G["oauth_default"] ")"
+    print "                         Bare -O is the opposite of the default."
     print "       -X               Toggle Toolforge Private Proxy (default: " (G["tfproxy"] == 1 ? "ON" : "OFF") ")"
     print "       -y               Print debugging to stderr (show URLs sent to API)"
     print "       -Y <target>      Print debugging to target: stderr, stdout, or a /file/path (appends)"
@@ -1644,7 +1659,7 @@ function uniq(names,    b,c,i,x) {
 #
 # Webpage to variable. url is assumed to be percent encoded.
 #
-function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, local_opts, wait, maxlag_val, current_url, final_url) {
+function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, local_opts, wait, maxlag_val, current_url, final_url, oauth_off) {
 
         if (G["debug"])
             print url > "/dev/stderr"                          
@@ -1662,6 +1677,7 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
             tries = 20
 
         force_post = 0  # force POST in proxy API if initial GET fails
+        oauth_off = 0   # set to 1 by the soft-OAuth fallback to retry this request anonymously
 
         for(i = 1; i <= tries; i++) {
             
@@ -1696,7 +1712,7 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
             }
 
             # --- OAUTH & HEADER BUILDER ---
-            if (G["oauth_read"] == 1 && current_url ~ /api\.php/ && !empty(G["consumerKey"]) && !empty(G["accessKey"]) && G["wta"] != "lynx") {
+            if (G["oauth_read"] == 1 && oauth_off == 0 && current_url ~ /api\.php/ && !empty(G["consumerKey"]) && !empty(G["accessKey"]) && G["wta"] != "lynx") {
                 
                 # Pass the correct payload and HTTP method for OAuth signing
                 auth_payload = is_post ? post_data : queryStr
@@ -1731,7 +1747,7 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                 final_url = G["tfproxy_url"] urlencodeawk(current_url)
                 
                 if (G["debug"]) {
-                    if (G["oauth_read"] == 1) { 
+                    if (G["oauth_read"] == 1 && oauth_off == 0) {
                         stdErr("http2var: [PROXY ACTIVE] Routing through tfproxy w/ OAuth")
                     } else {
                         stdErr("http2var: [PROXY ACTIVE] Routing through tfproxy w/out OAuth")
@@ -1742,7 +1758,7 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                 
                 # Add a clean debug notification when the bypass is used
                 if (G["debug"] && G["tfproxy_pass"] != "" && G["tfproxy"] == 0) {
-                    if (G["oauth_read"] == 1) {
+                    if (G["oauth_read"] == 1 && oauth_off == 0) {
                         stdErr("http2var: [PROXY BYPASSED] Direct connection w/ OAuth")
                     } else {
                         stdErr("http2var: [PROXY BYPASSED] Direct connection w/out OAuth")
@@ -1769,9 +1785,22 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                           stdErr("http2var: [WARNING] API Overload or Rate Limit (Attempt " i ").")
                         wait = 15 + (i * 10) 
                     } else if (op ~ /"mwoauth-/) {
-                        if(G["debug"])
-                          stdErr("http2var: [WARNING] Transient OAuth Drop (Attempt " i ")" final_url)
-                        wait = 10 + (i * 5) 
+                        # A mwoauth-invalid-authorization-* grant error can never succeed on this wiki, and soft
+                        # mode accepts any mwoauth- error: retry this request anonymously, immediately.
+                        if (op ~ /"mwoauth-invalid-authorization/ || G["oauth_soft"] == 1) {
+                            if (G["debug"]) {
+                                if (G["oauth_soft"] == 1)
+                                  stdErr("http2var: [INFO] OAuth rejected; soft fallback to anonymous (Attempt " i ")" final_url)
+                                else
+                                  stdErr("http2var: [INFO] OAuth grant invalid on this wiki; falling back to anonymous (Attempt " i ")" final_url)
+                            }
+                            oauth_off = 1
+                            wait = 0
+                        } else {
+                            if(G["debug"])
+                              stdErr("http2var: [WARNING] Transient OAuth Drop (Attempt " i ")" final_url)
+                            wait = 10 + (i * 5)
+                        }
                     } else {
                         if(G["debug"])
                           stdErr("http2var: [FATAL API ERROR] " substr(op, 1, 300))
@@ -1787,7 +1816,9 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                 else if (url ~ /format=json/ && op !~ /}[ \t\n]*$/) {
                      if(G["debug"])
                        stdErr("http2var: [WARNING] Truncated Payload or Gateway Drop (Attempt " i ").")
-                     wait = 15 + (i * 10)
+                     # A dropped proxy connection arrives as a short non-JSON body and is instantly
+                     #  retryable, unlike maxlag/ratelimited which keep the long backoff.
+                     wait = 2
                      force_post = 1
                 }
                 else {
@@ -2922,11 +2953,11 @@ function getEditToken(type,   sp,jsona,command,data,i) {
     for (i = 1; i <= 3; i++) {
         sp = sys2var(command)
         query_json(sp, jsona)
-        
+
         if (!empty(jsona["query","tokens",type "token"])) {
             return jsona["query","tokens",type "token"]
         }
-        
+
         if (G["debug"]) {
             stdErr("getEditToken: Failed to fetch token. Retrying... (" i "/3)")
         }

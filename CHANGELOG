@@ -1,6 +1,13 @@
 # Changes
 #
-# 1.51 May 21      - fix rare bug in JSON code 
+# 1.52 Sep 30      - -O takes an optional mode: on | off | soft (soft = OAuth with anonymous fallback)
+#                    bare -O is the opposite of the new G["oauth_default"] setting
+#                  - OAuth grant errors (mwoauth-invalid-authorization-*) retry anonymously at once
+#                    instead of backing off
+#                  - short retry wait after a dropped proxy connection or truncated JSON response
+#                  - (Sep 11, unlogged) -M POST with -U for authenticated raw writes; token=AUTO and
+#                    token=AUTO:rollback are replaced with a fresh token
+# 1.51 May 21      - fix rare bug in JSON code
 # 1.50 May 15      - MAJOR RELEASE. See RELEASE-NOTES.1.50 for details
 # 1.35 Mar 23      - fix a 1 in 256 intermittent problem in MWOAuthGenerateHeader() causing 
 #                    OAuth "Invalid signature" error.
