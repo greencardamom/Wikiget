@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.52 \
+                 version   = 1.53 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -1821,6 +1821,19 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
                      wait = 2
                      force_post = 1
                 }
+                else if (length(op) < 500 && op ~ /upstream connect error|upstream request timeout|no healthy upstream|reset reason: /) {
+                     if(G["debug"])
+                       stdErr("http2var: [WARNING] Proxy or Gateway Drop (Attempt " i ").")
+                     # A proxy drop is a short plain-text body. Any format can get it, including xml and action=raw
+                     wait = 2 + i
+                }
+                else if (url ~ /format=xml/ && op !~ /<api[ >\/]/) {
+                     if(G["debug"])
+                       stdErr("http2var: [WARNING] Truncated XML Payload or Gateway Drop (Attempt " i ").")
+                     # The xml form of the json check above. Search (-a) uses format=xml
+                     wait = 2
+                     force_post = 1
+                }
                 else {
                     return op 
                 }
@@ -1839,6 +1852,11 @@ function http2var(url,  tries, i, op, baseUrl, queryStr, authHeader, headerCmd, 
         }
 
         # --- EXHAUSTION CATCH ---
+        # A paging loop that gets "" stops early and prints a partial list with exit 0. So an API failure stops the program
+        if (url ~ /api[.]php/) {
+            stdErr("wikiget: API request failed after " tries " tries. Stopping so that no partial result is printed: " url)
+            exit 1
+        }
         if (G["debug"]) {
             stdErr("http2var: [ABORT] Maximum retries (" tries ") exhausted. Giving up on URL.")
         }

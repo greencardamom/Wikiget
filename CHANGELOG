@@ -1,5 +1,7 @@
 # Changes
 #
+# 1.53 Oct 20      - API failure after all retries now exits 1 instead of printing a partial list.
+#                    Also retries proxy/gateway drops and truncated XML responses
 # 1.52 Sep 30      - -O takes an optional mode: on | off | soft (soft = OAuth with anonymous fallback)
 #                    bare -O is the opposite of the new G["oauth_default"] setting
 #                  - OAuth grant errors (mwoauth-invalid-authorization-*) retry anonymously at once
