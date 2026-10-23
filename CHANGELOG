@@ -1,5 +1,8 @@
 # Changes
 #
+# 1.54 Oct 22      - add -L: with -x, print "title<TAB>url" for each link instead of just the title
+#                    (filter the url locally to select a path, eg. domain.com/path/)
+#                  - edit-comment exclude regex moves from -j to -H (-j clashed with the search-count flag and never took its argument)
 # 1.53 Oct 20      - API failure after all retries now exits 1 instead of printing a partial list.
 #                    Also retries proxy/gateway drops and truncated XML responses
 # 1.52 Sep 30      - -O takes an optional mode: on | off | soft (soft = OAuth with anonymous fallback)

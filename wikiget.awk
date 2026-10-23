@@ -54,7 +54,7 @@ BEGIN { # Program cfg
     _defaults = "contact   = User:MY_NAME \
                  emailfp   = /path/to/secrets/myname.email \
                  program   = Wikiget \
-                 version   = 1.53 \
+                 version   = 1.54 \
                  copyright = 2016-2026 \
                  maxlag    = 10 \
                  lang      = en \
@@ -122,7 +122,7 @@ BEGIN { # Program run
 #
 function parsecommandline(c,opts,Arguments) {
 
-    while ((c = getopt(ARGC, ARGV, "XOIyrhVfjpdo:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:R:T:AB:G:N:U:Y:M:")) != -1) {
+    while ((c = getopt(ARGC, ARGV, "LXOIyrhVfjpdH:o:k:a:g:i:s:e:u:m:b:l:n:w:c:t:q:x:z:F:E:S:P:R:T:AB:G:N:U:Y:M:")) != -1) {
         opts++
         if (c == "h") {
             usage()
@@ -177,7 +177,7 @@ function parsecommandline(c,opts,Arguments) {
             Arguments["endtime"] = verifyval(Optarg)
         if (c == "i")                                 #  -i <regex>      Edit comment must include this regex match
             Arguments["inccomments"] = verifyval(Optarg)
-        if (c == "j")                                 #  -j <regex>      Edit comment must exclude this regex match
+        if (c == "H")                                 #  -H <regex>      Edit comment must exclude this regex match
             Arguments["exccomments"] = verifyval(Optarg)
         
         if (c == "n")                                 #  -n <namespace>  Namespace for -u, -a and -x (option)
@@ -264,6 +264,8 @@ function parsecommandline(c,opts,Arguments) {
         }
         if (c == "X")                                 #  -X              Toggle Toolforge proxy
             Arguments["toggle_tfproxy"] = 1
+        if (c == "L")                                 #  -L              With -x, print title<TAB>url per link
+            Arguments["xurl"] = 1
         if (c == "y")                                 #  -y              Show debugging info to stderr
             Arguments["debug"] = 1
         if (c == "Y") {                               #  -Y <target>     Show debugging info and route to target "stdout" or <filename>
@@ -315,6 +317,9 @@ function processarguments(Arguments,   c,a,i,oauth_mode) {
         if (G["tfproxy"] == 1) G["tfproxy"] = 0
         else G["tfproxy"] = 1
     }
+
+    # -x asks the API for the link url as well as the page title
+    G["euprop"] = Arguments["xurl"] ? "title|url" : "title"
 
     if (length(Arguments["lang"]) > 0)                                # Check options, set defaults
         G["lang"] = Arguments["lang"]
@@ -553,7 +558,7 @@ function usage(die) {
     print "         -e <endtime>   End time in YMD format (-e 20151231). If same as -s," 
     print "                         does 24hr range. Required with -u"
     print "         -i <regex>     (option) Edit comment must include regex match"
-    print "         -j <regex>     (option) Edit comment must exclude regex match"
+    print "         -H <regex>     (option) Edit comment must exclude regex match"
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -564,7 +569,7 @@ function usage(die) {
     print "         -o <username>  Only list changes made by this user"
     print "         -k <tag>       Only list changes tagged with this tag"
     print "         -i <regex>     (option) Edit comment must include regex match"
-    print "         -j <regex>     (option) Edit comment must exclude regex match"
+    print "         -H <regex>     (option) Edit comment must exclude regex match"
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
@@ -594,6 +599,8 @@ function usage(die) {
     print "         -n <namespace> (option) Pipe-separated numeric value(s) of namespace"
     print "                         Only list pages in this namespace. Default: 0"
     print "                         See -h for NS codes and examples"
+    print "         -L             (option) Print \"title<TAB>url\" for each link, not just the title."
+    print "                         Filter the url locally to select a path, eg. domain.com/path/"
     print ""
     print " Print wiki text:"
     print "       -w <article>     Print wiki text of article"
@@ -971,7 +978,7 @@ function xlinks(entity,   url,results,a,c,i) {
         c = split("http|https|ftp|ftps|sftp", a, /[|]/)
         # iterate for euprotocol=a[i]
         for(i = 1; i <= c; i++) {
-          url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(a[i]) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
+          url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(a[i]) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=" urlencodeawk(G["euprop"]) "&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"]
           
           # Pass a[i] to preserve the correct protocol during pagination
           results = results "\n" getxlinks(url, entity, a[i]) 
@@ -989,18 +996,18 @@ function getxlinks(url, entity, euprotocol,     jsonin, jsonout, continuecode) {
         jsonin = http2var(url)
         if (apierror(jsonin, "json") > 0)
             return ""
-        jsonout = json2var(jsonin)
+        jsonout = (G["euprop"] == "title") ? json2var(jsonin) : json2varXurl(jsonin)
         continuecode = getcontinue(jsonin,"eucontinue")
 
         while ( continuecode != "-1-1!!-1-1" ) {
-            url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=title&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
-            
+            url = G["apiURL"] "action=query&list=exturlusage&euprotocol=" urlencodeawk(euprotocol) "&euexpandurl=&euquery=" urlencodeawk(entity) "&euprop=" urlencodeawk(G["euprop"]) "&eulimit=max&eunamespace=" urlencodeawk(G["namespace"]) "&format=json&formatversion=2&maxlag=" G["maxlag"] "&continue=" urlencodeawk("-||") "&eucontinue=" urlencodeawk(continuecode, "rawphp")
+
             jsonin = http2var(url)
-            
+
             if (apierror(jsonin, "json") > 0)
                 return ""
-                
-            jsonout = jsonout "\n" json2var(jsonin)
+
+            jsonout = jsonout "\n" ((G["euprop"] == "title") ? json2var(jsonin) : json2varXurl(jsonin))
             continuecode = getcontinue(jsonin,"eucontinue")
 
         }
@@ -1527,6 +1534,19 @@ function json2var(json,  jsona,arr) {
     if (query_json(json, jsona) >= 0) {
         splitja(jsona, arr, 3, "title")
         return join(arr, 1, length(arr), "\n")
+    }
+}
+
+#
+# json2varXurl - exturlusage with euprop=title|url: one "title<TAB>url" line per link. Title and url share the row number
+#
+function json2varXurl(json,  jsona,arrT,arrU,row,out) {
+    if (query_json(json, jsona) >= 0) {
+        splitja(jsona, arrT, 3, "title")
+        splitja(jsona, arrU, 3, "url")
+        for (row in arrT)
+            out = out (empty(out) ? "" : "\n") arrT[row] "\t" arrU[row]
+        return out
     }
 }
 

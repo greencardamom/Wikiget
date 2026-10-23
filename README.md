@@ -41,18 +41,18 @@ Wikiget options and examples:
 	         -e <endtime>   End time in YMD format (-e 20151231). If same as -s,
 	                         does 24hr range. Required with -u
 	         -i <regex>     (option) Edit comment must include regex match
-	         -j <regex>     (option) Edit comment must exclude regex match
+	         -H <regex>     (option) Edit comment must exclude regex match
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
 	
 	 Recent changes:
 	       -r               Recent changes (past 30 days) aka Special:RecentChanges
-	                         Either -o or -t required
+	                         Either -o or -k required
 	         -o <username>  Only list changes made by this user
 	         -k <tag>       Only list changes tagged with this tag
 	         -i <regex>     (option) Edit comment must include regex match
-	         -j <regex>     (option) Edit comment must exclude regex match
+	         -H <regex>     (option) Edit comment must exclude regex match
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
@@ -82,6 +82,8 @@ Wikiget options and examples:
 	         -n <namespace> (option) Pipe-separated numeric value(s) of namespace
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
+	         -L             (option) Print "title<TAB>url" for each link, not just the title.
+	                         Filter the url locally to select a path, eg. domain.com/path/
 	
 	 Print wiki text:
 	       -w <article>     Print wiki text of article
@@ -96,6 +98,17 @@ Wikiget options and examples:
 	                         Only list pages in this namespace. Default: 0
 	                         See -h for NS codes and examples
 	
+	 API request:
+	        -U <url>         Send a custom API query. Uses OAuth authentication, if enabled.
+	                         Will deftly handle maxlag, retry and pause loops.
+	                         Can be the full URL, or just the query string.
+	                         Example: wikiget -U "action=query&meta=siteinfo&format=json"
+	                         Note: URL values must be percent-encoded (e.g., %20 for spaces).
+	         -M <method>    (option) GET (default) or POST. POST sends the query as an
+	                         authenticated write, enabling any write action through -U.
+	                         A literal token=AUTO is replaced with a fresh CSRF token;
+	                         token=AUTO:rollback fetches a rollback token.
+	
 	 Edit page:
 	       -E <title>       Edit a page with this title. Requires -S and -P
 	         -S <summary>   Edit summary
@@ -106,6 +119,7 @@ Wikiget options and examples:
 	         -T <page>      Move to page name
 	
 	       -G <page>        Purge page
+	       -N <page>        Null edit page (forces category/template refresh)
 	       -I               Show OAuth userinfo
 	
 	 Global options:
@@ -113,9 +127,13 @@ Wikiget options and examples:
 	                         See https://en.wikipedia.org/wiki/List_of_Wikipedias
 	       -z <project>     Wiki project (default: wikipedia)
 	                         https://en.wikipedia.org/wiki/Wikipedia:Wikimedia_sister_projects
-	       -m <#>           API maxlag value (default: 5)
+	       -m <#>           API maxlag value (default: 10)
 	                         See https://www.mediawiki.org/wiki/API:Etiquette#Use_maxlag_parameter
+	       -O <on|off|soft> OAuth for read requests: on=force, off=anonymous, soft=OAuth w/ anon fallback. (default: off)
+	                         Bare -O is the opposite of the default.
+	       -X               Toggle Toolforge Private Proxy (default: OFF)
 	       -y               Print debugging to stderr (show URLs sent to API)
+	       -Y <target>      Print debugging to target: stderr, stdout, or a /file/path (appends)
 	       -V               Version and copyright
 	       -h               Help with examples
 	
@@ -206,7 +224,10 @@ Wikiget options and examples:
 	     wikiget -E "Paris" -S "Fix spelling" -P "/home/paris.ws"
 	   Input via stdin
 	     cat /home/paris.ws | wikiget -E "Paris" -S "Fix spelling" -P STDIN
+	   Purge page
+	     wikiget -G "Paris"
 	
+
 
 Installation
 =============
